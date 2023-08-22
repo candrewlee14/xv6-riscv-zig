@@ -3,9 +3,9 @@ const mem = std.mem;
 const RunStep = std.Build.RunStep;
 const CompileStep = std.Build.CompileStep;
 const InstallFileStep = std.Build.InstallFileStep;
-const MakeFilesystemStep = @import("Build/MakeFilesystemStep.zig");
-const SyscallGenStep = @import("Build/SyscallGenStep.zig");
-const QemuRunStep = @import("Build/QemuRunStep.zig");
+const MakeFilesystemStep = @import("build/MakeFilesystemStep.zig");
+const SyscallGenStep = @import("build/SyscallGenStep.zig");
+const QemuRunStep = @import("build/QemuRunStep.zig");
 
 const kernel_src = [_][]const u8{
     "src/kernel/entry.S", // Very first boot instructions.
