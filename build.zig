@@ -31,8 +31,7 @@ const kernel_src = [_][]const u8{
     "src/kernel/kernelvec.S", // Handle traps from kernel, and timer interrupts.
     "src/kernel/plic.c", // RISC-V interrupt controller.
     "src/kernel/virtio_disk.c", // Disk device driver.
-    // "src/kernel/kalloc.c", // Disk device driver.
-    // "src/kernel/printf.c", // Disk device driver.
+    "src/kernel/kalloc.c", // Disk device driver.
 };
 
 const cflags = [_][]const u8{
