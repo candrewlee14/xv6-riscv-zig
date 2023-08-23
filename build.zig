@@ -40,7 +40,7 @@ const cflags = [_][]const u8{
     "-Werror",
     "-Wno-gnu-designator", // workaround for compiler error
     "-fno-omit-frame-pointer",
-    "-gdwarf-2",
+    "-gdwarf-4",
     "-MD",
     "-ggdb",
     "-ffreestanding",
@@ -50,6 +50,7 @@ const cflags = [_][]const u8{
     "-fno-pie",
     "-fno-stack-protector",
     "-Wno-unused-but-set-variable", // workaround for compiler error
+    "-g",
 };
 
 const user_progs = [_][]const u8{
@@ -125,7 +126,10 @@ pub fn build(b: *std.build.Builder) !void {
     kernel.addIncludePath(.{ .path = "src" });
     kernel.setLinkerScriptPath(.{ .path = kernel_linker });
     kernel.code_model = .medium;
-    kernel.strip = true;
+    kernel.strip = false; // change?
+    kernel.want_lto = true;
+    // kernel.rdynamic = true;
+    // kernel.compress_debug_sections = .zlib;
     b.installArtifact(kernel);
 
     const syscall_gen_step = addSyscallGen(b, &syscalls);

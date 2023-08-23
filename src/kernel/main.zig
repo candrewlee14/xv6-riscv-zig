@@ -24,9 +24,13 @@ pub fn kmain() void {
         kmain_log.info("xv6 kernel is booting", .{});
         kmain_log.info("kalloc", .{});
         kalloc.init(); // physical page allocator
+        // c.kinit();
+
         kmain_log.info("kvminit", .{});
-        kvm.init(); // create kernel page table
-        kvm.initHart(); // turn on paging
+        c.kvminit();
+        c.kvminithart();
+        // kvm.init(); // create kernel page table
+        // kvm.initHart(); // turn on paging
         kmain_log.info("procinit", .{});
         c.procinit(); // process table
         kmain_log.info("trapinit", .{});
