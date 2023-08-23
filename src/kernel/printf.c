@@ -115,17 +115,17 @@ printf(char *fmt, ...)
     release(&pr.lock);
 }
 
-void
-panic(char *s)
-{
-  pr.locking = 0;
-  printf("panic: ");
-  printf(s);
-  printf("\n");
-  panicked = 1; // freeze uart output from other CPUs
-  for(;;)
-    ;
-}
+// void
+// panic(char *s)
+// {
+//   pr.locking = 0;
+//   printf("panic: ");
+//   printf(s);
+//   printf("\n");
+//   panicked = 1; // freeze uart output from other CPUs
+//   for(;;)
+//     ;
+// }
 
 void
 printfinit(void)

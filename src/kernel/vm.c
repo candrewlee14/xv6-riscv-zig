@@ -15,39 +15,42 @@ extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[]; // trampoline.S
 
-// Make a direct-map page table for the kernel.
-pagetable_t
-kvmmake(void)
-{
-  pagetable_t kpgtbl;
 
-  kpgtbl = (pagetable_t) kalloc();
-  memset(kpgtbl, 0, PGSIZE);
 
-  // uart registers
-  kvmmap(kpgtbl, UART0, UART0, PGSIZE, PTE_R | PTE_W);
-
-  // virtio mmio disk interface
-  kvmmap(kpgtbl, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
-
-  // PLIC
-  kvmmap(kpgtbl, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
-
-  // map kernel text executable and read-only.
-  kvmmap(kpgtbl, KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
-
-  // map kernel data and the physical RAM we'll make use of.
-  kvmmap(kpgtbl, (uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W);
-
-  // map the trampoline for trap entry/exit to
-  // the highest virtual address in the kernel.
-  kvmmap(kpgtbl, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
-
-  // allocate and map a kernel stack for each process.
-  proc_mapstacks(kpgtbl);
-  
-  return kpgtbl;
-}
+// // Make a direct-map page table for the kernel.
+// pagetable_t
+// kvmmake(void)
+// {
+//   pagetable_t kpgtbl;
+//
+//   kpgtbl = (pagetable_t) kalloc();
+//   memset(kpgtbl, 0, PGSIZE);
+//
+//   // uart registers
+//   kvmmap(kpgtbl, UART0, UART0, PGSIZE, PTE_R | PTE_W);
+//
+//   // virtio mmio disk interface
+//   kvmmap(kpgtbl, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+//
+//   // PLIC
+//   kvmmap(kpgtbl, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+//
+//   // map kernel text executable and read-only.
+//   kvmmap(kpgtbl, KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
+//
+//   // map kernel data and the physical RAM we'll make use of.
+//   kvmmap(kpgtbl, (uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W);
+//
+//   // map the trampoline for trap entry/exit to
+//   // the highest virtual address in the kernel.
+//   kvmmap(kpgtbl, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+//
+//   // allocate and map a kernel stack for each process.
+//   proc_mapstacks(kpgtbl);
+//   
+//   return kpgtbl;
+// }
+extern pagetable_t kvmmake(void);
 
 // Initialize the one kernel_pagetable
 void

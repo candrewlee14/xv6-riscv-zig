@@ -6,20 +6,25 @@ const c = @cImport({
     @cInclude("kernel/defs.h");
 });
 const std = @import("std");
+const log_root = @import("log.zig");
+const kmain_log = std.log.scoped(.kmain);
+const riscv = @import("riscv.zig");
+const kalloc = @import("kalloc.zig");
+const kvm = @import("kvm.zig");
+const console = @import("console.zig");
+const Proc = @import("Proc.zig");
 const Atomic = std.atomic.Atomic;
 
 var started = Atomic(bool).init(false);
 
 pub fn kmain() void {
-    if (c.cpuid() == 0) {
-        c.consoleinit();
-        c.printfinit();
-        c.printf(@constCast(@ptrCast("\n")));
-        c.printf(@constCast(@ptrCast("xv6 kernel is booting\n")));
-        c.printf(@constCast(@ptrCast("\n")));
-        c.kinit(); // physical page allocator
-        c.kvminit(); // create kernel page table
-        c.kvminithart(); // turn on paging
+    if (Proc.cpuId() == 0) {
+        console.init();
+        c.consoleinit(); // one init step is not implementated in zig
+        kmain_log.info("xv6 kernel is booting\n", .{});
+        kalloc.init(); // physical page allocator
+        kvm.init(); // create kernel page table
+        kvm.initHart(); // turn on paging
         c.procinit(); // process table
         c.trapinit(); // trap vectors
         c.trapinithart(); // install kernel trap vector
@@ -34,8 +39,8 @@ pub fn kmain() void {
     } else {
         while (!started.load(.SeqCst)) {}
 
-        c.printf(@constCast(@ptrCast("hart %d starting\n")), c.cpuid());
-        c.kvminithart(); // turn on paging
+        kmain_log.info("hart {d} starting\n", .{Proc.cpuId()});
+        kvm.initHart(); // turn on paging
         c.trapinithart(); // install kernel trap vector
         c.plicinithart(); // ask PLIC for device interrupts
     }

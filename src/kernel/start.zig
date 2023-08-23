@@ -3,7 +3,7 @@ const riscv = @import("riscv.zig");
 const main = @import("main.zig");
 const param = @import("param.zig");
 const memlayout = @import("memlayout.zig");
-// const log_root = @import("log.zig");
+const log_root = @import("log.zig");
 
 // a scratch area per CPU for machine-mode timer interrupts.
 var timer_scratch: [param.NCPU][5]usize = undefined;
@@ -95,9 +95,9 @@ pub fn panic(
     @setCold(true);
     _ = error_return_trace;
     const panic_log = std.log.scoped(.panic);
-    // log_root.locking = false;
+    log_root.locking = false;
     panic_log.err("{s}\n", .{msg});
-    // log_root.panicked = true; // freeze uart output from other CPUs
+    log_root.panicked = true; // freeze uart output from other CPUs
     while (true) {}
 }
 
@@ -106,5 +106,5 @@ pub const std_options = struct {
     pub const log_level = .debug;
 
     // Define logFn to override the std implementation
-    // pub const logFn = log_root.klogFn;
+    pub const logFn = log_root.klogFn;
 };
