@@ -1,7 +1,7 @@
 const std = @import("std");
 const mem = std.mem;
 const fmt = std.fmt;
-const SpinLock = @import("SpinLock.zig");
+const SpinLock = @import("spinlock.zig");
 const console = @import("console.zig");
 
 /// The errors that can occur when logging
@@ -27,13 +27,14 @@ pub fn klogFn(
     comptime format: []const u8,
     args: anytype,
 ) void {
+    @setRuntimeSafety(false);
     const need_lock = locking;
     if (need_lock) lock.acquire();
 
     const scope_prefix = "(" ++ @tagName(scope) ++ "): ";
 
     const prefix = "[" ++ comptime level.asText() ++ "] " ++ scope_prefix;
-    print(prefix ++ format, args);
+    print(prefix ++ format ++ "\n", args);
 
     if (need_lock) lock.release();
 }
@@ -55,6 +56,7 @@ pub fn print(comptime format: []const u8, args: anytype) void {
 }
 
 pub export fn printf(format: [*:0]const u8, ...) void {
+    @setRuntimeSafety(false);
     var need_lock = locking;
     if (need_lock) lock.acquire();
 

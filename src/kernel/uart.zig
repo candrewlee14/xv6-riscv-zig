@@ -1,5 +1,5 @@
 const memlayout = @import("memlayout.zig");
-const SpinLock = @import("SpinLock.zig");
+const SpinLock = @import("spinlock.zig");
 const console = @import("console.zig");
 const log_root = @import("log.zig");
 const Proc = @import("Proc.zig");

@@ -4,7 +4,7 @@ const Atomic = std.atomic.Atomic;
 const riscv = @import("riscv.zig");
 const Proc = @import("Proc.zig");
 const Cpu = @import("Cpu.zig");
-
+const lock_log = std.log.scoped(.spinlock);
 // Mutual exclusion lock.
 lock: Atomic(bool) = Atomic(bool).init(false), // Is the lock held?
 // For debugging:
@@ -12,16 +12,17 @@ cpu: *Cpu = undefined, // The cpu holding the lock.
 
 const SpinLock = @This();
 
-//pub fn init() SpinLock {
-//    return SpinLock{
-//        .lock = Atomic(bool).init(false),
-//        .cpu = undefined,
-//    };
-//}
+pub fn init() SpinLock {
+    return SpinLock{
+        .lock = Atomic(bool).init(false),
+        .cpu = undefined,
+    };
+}
 
 /// Acquire the lock.
 /// Loops (spins) until the lock is acquired.
 pub fn acquire(self: *SpinLock) void {
+    @setRuntimeSafety(false);
     pushOff(); // disable interrupts to avoid deadlock.
 
     if (self.holding()) @panic("acquire");
@@ -43,6 +44,7 @@ pub fn acquire(self: *SpinLock) void {
 
 /// Release the lock.
 pub fn release(self: *SpinLock) void {
+    @setRuntimeSafety(false);
     if (!self.holding()) @panic("release");
     self.cpu = undefined;
 
@@ -66,10 +68,12 @@ pub fn release(self: *SpinLock) void {
 }
 
 pub fn holding(self: *SpinLock) bool {
+    @setRuntimeSafety(false);
     return self.lock.load(.Unordered) and self.cpu == Proc.myCpu();
 }
 
 pub fn pushOff() void {
+    @setRuntimeSafety(false);
     var old = riscv.intr_get();
 
     riscv.intr_off();
@@ -81,6 +85,7 @@ pub fn pushOff() void {
 }
 
 pub fn popOff() void {
+    @setRuntimeSafety(false);
     var cpu = Proc.myCpu();
 
     if (riscv.intr_get())

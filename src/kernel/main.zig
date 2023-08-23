@@ -21,25 +21,37 @@ pub fn kmain() void {
     if (Proc.cpuId() == 0) {
         console.init();
         c.consoleinit(); // one init step is not implementated in zig
-        kmain_log.info("xv6 kernel is booting\n", .{});
+        kmain_log.info("xv6 kernel is booting", .{});
+        kmain_log.info("kalloc", .{});
         kalloc.init(); // physical page allocator
+        kmain_log.info("kvminit", .{});
         kvm.init(); // create kernel page table
         kvm.initHart(); // turn on paging
+        kmain_log.info("procinit", .{});
         c.procinit(); // process table
+        kmain_log.info("trapinit", .{});
         c.trapinit(); // trap vectors
+        kmain_log.info("trapinithart", .{});
         c.trapinithart(); // install kernel trap vector
+        kmain_log.info("plicinit", .{});
         c.plicinit(); // set up interrupt controller
+        kmain_log.info("plicinithart", .{});
         c.plicinithart(); // ask PLIC for device interrupts
+        kmain_log.info("binit", .{});
         c.binit(); // buffer cache
+        kmain_log.info("iinit", .{});
         c.iinit(); // inode table
+        kmain_log.info("fileinit", .{});
         c.fileinit(); // file table
+        kmain_log.info("virtio_disk_init", .{});
         c.virtio_disk_init(); // emulated hard disk
+        kmain_log.info("userinit", .{});
         c.userinit(); // first user process
         started.store(true, .SeqCst);
     } else {
         while (!started.load(.SeqCst)) {}
 
-        kmain_log.info("hart {d} starting\n", .{Proc.cpuId()});
+        kmain_log.info("hart {d} starting", .{Proc.cpuId()});
         kvm.initHart(); // turn on paging
         c.trapinithart(); // install kernel trap vector
         c.plicinithart(); // ask PLIC for device interrupts

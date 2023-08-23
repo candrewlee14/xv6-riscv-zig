@@ -25,10 +25,10 @@ pub const PageWalkOptions = struct {
 };
 
 pub fn init() void {
-    kvm_log.debug("start init kernel page table\n", .{});
+    kvm_log.debug("start init kernel page table", .{});
     kernel_page = make() catch |err| @panic(@errorName(err));
     kernel_pagetable = kernel_page.ptr; // should be removed
-    kvm_log.debug("kernel page table init success\n", .{});
+    kvm_log.debug("kernel page table init success", .{});
 }
 
 pub fn make() ![]usize {

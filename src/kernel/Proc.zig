@@ -6,7 +6,7 @@ const Cpu = @import("Cpu.zig");
 const kvm = @import("kvm.zig");
 const kalloc = @import("kalloc.zig");
 const memlayout = @import("memlayout.zig");
-const SpinLock = @import("SpinLock.zig");
+const SpinLock = @import("spinlock.zig");
 const mem = std.mem;
 
 const c = @cImport({

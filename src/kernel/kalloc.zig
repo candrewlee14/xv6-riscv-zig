@@ -1,7 +1,7 @@
 const std = @import("std");
 const riscv = @import("riscv.zig");
 const memlayout = @import("memlayout.zig");
-const SpinLock = @import("SpinLock.zig");
+const SpinLock = @import("spinlock.zig");
 const Queue = @import("queue.zig").Queue;
 const Stack = std.atomic.Stack;
 const kalloc_log = std.log.scoped(.kalloc);
@@ -20,18 +20,18 @@ pub fn init() void {
     var start = mem.alignForward(usize, @intFromPtr(&end), mem.page_size);
     var ptr: [*]u8 align(mem.page_size) = @alignCast(@as([*]u8, @ptrFromInt(start)));
     kalloc_log.debug(
-        "available [0x{x} - 0x{x}]\n",
+        "available [0x{x} - 0x{x}]",
         .{ start, memlayout.PHYSTOP },
     );
-    kalloc_log.debug("start init kernel page allocator\n", .{});
+    kalloc_log.debug("start init kernel page allocator", .{});
     freePages(ptr[0..(memlayout.PHYSTOP - start)]);
-    kalloc_log.debug("init kernel page allocator success\n", .{});
+    kalloc_log.debug("init kernel page allocator success", .{});
 }
 
 pub fn freePages(pages: []u8) void {
     var i: usize = 0;
-    while ((i + 4096) <= pages.len) : (i += 4096) {
-        freePage(pages[i..].ptr[0..riscv.PGSIZE]);
+    while ((i + riscv.PGSIZE) <= pages.len) : (i += riscv.PGSIZE) {
+        freePage(pages[i..][0..riscv.PGSIZE]);
     }
 }
 
@@ -50,9 +50,8 @@ pub fn freePage(page: []u8) void {
         @panic("invalid addr to free");
 
     @memset(page[0..riscv.PGSIZE], 1);
-
     lock.acquire();
-    free_pages.push(@as(*Page, @alignCast(@ptrCast(page.ptr))));
+    free_pages.push(@ptrFromInt(@intFromPtr(page.ptr)));
     lock.release();
 }
 

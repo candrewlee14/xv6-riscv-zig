@@ -1,5 +1,6 @@
 const std = @import("std");
 const assert = std.debug.assert;
+const queue_log = std.log.scoped(.queue);
 
 /// An intrusive first in/first out linked list.
 /// The element type T must have a field called "next" of type ?*T
@@ -14,7 +15,9 @@ pub fn Queue(comptime T: type) type {
         name: ?[]const u8,
 
         pub fn push(self: *Self, elem: *T) void {
-            assert(elem.next == null);
+            // queue_log.info("asserting elem.next == null, {*}", .{elem.next});
+            // assert(elem.next == null);
+            // queue_log.info("asserted elem.next == null", .{});
             if (self.in) |in| {
                 in.next = elem;
                 self.in = elem;

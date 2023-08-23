@@ -15,7 +15,7 @@ const c = @cImport({
 
 const Proc = @import("Proc.zig");
 const uart = @import("uart.zig");
-const SpinLock = @import("SpinLock.zig");
+const SpinLock = @import("spinlock.zig");
 
 const BUF_SIZE = 128;
 const BACKSPACE = 0x100;
