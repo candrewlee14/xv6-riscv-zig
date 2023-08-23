@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const os = std.os;
 const mem = std.mem;
 const math = std.math;
@@ -92,15 +93,15 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     assert(fs.BSIZE % @sizeOf(fs.Dinode) == 0);
     assert(fs.BSIZE % @sizeOf(fs.Dirent) == 0);
 
-    file = try dir.createFile(
-        self.dest_filename,
-        .{
-            .read = true,
-            .truncate = true,
-            .mode = os.S.IRUSR | os.S.IWUSR | os.S.IRGRP |
-                os.S.IWGRP | os.S.IROTH | os.S.IWOTH,
-        },
-    );
+    var flags = std.fs.File.CreateFlags{
+        .read = true,
+        .truncate = true,
+    };
+    if (builtin.os.tag != .windows) {
+        flags.mode = os.S.IRUSR | os.S.IWUSR | os.S.IRGRP | os.S.IWGRP |
+            os.S.IROTH | os.S.IWOTH;
+    }
+    file = try dir.createFile(self.dest_filename, flags);
     defer file.close();
 
     const nmeta = 2 + nlog + ninodeblocks + nbitmap;
