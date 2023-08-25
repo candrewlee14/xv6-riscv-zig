@@ -1,10 +1,7 @@
 const std = @import("std");
 const param = @import("param.zig");
 const riscv = @import("riscv.zig");
-// const swtch = @import("swtch.zig");
 const Cpu = @import("Cpu.zig");
-const kvm = @import("kvm.zig");
-const kalloc = @import("kalloc.zig");
 const memlayout = @import("memlayout.zig");
 const SpinLock = @import("spinlock.zig");
 const mem = std.mem;
@@ -12,6 +9,8 @@ const mem = std.mem;
 const c = @cImport({
     @cInclude("kernel/types.h");
     @cInclude("kernel/param.h");
+    @cInclude("kernel/memlayout.h");
+    @cInclude("kernel/riscv.h");
     @cInclude("kernel/spinlock.h");
     @cInclude("kernel/proc.h");
     @cInclude("kernel/defs.h");
@@ -95,9 +94,16 @@ pub fn myCpu() *Cpu {
 pub fn myProc() *Proc {
     SpinLock.pushOff();
     var cpu = myCpu();
-    var proc = cpu.proc;
+    var proc = cpu.proc orelse unreachable;
     SpinLock.popOff();
     return proc;
+}
+
+pub fn isKilled(self: *Proc) bool {
+    self.lock.acquire();
+    const k = self.killed;
+    self.lock.release();
+    return k;
 }
 
 pub fn sched() void {
@@ -114,7 +120,7 @@ pub fn sched() void {
 
     var intena = myCpu().intena;
 
-    c.swtch(&p.context, &myCpu().context);
+    c.swtch(@ptrCast(&p.context), @ptrCast(&myCpu().context));
     // swtch.swtch(&p.context, &MyCpu().context);
     myCpu().intena = intena;
 }
@@ -149,7 +155,7 @@ pub fn sleep(chan: *anyopaque, lock: *SpinLock) void {
 // Wake up all processes sleeping on chan.
 // Must be called without any p->lock.
 pub fn wakeup(chan: *anyopaque) void {
-    for (procs) |*proc| {
+    for (&procs) |*proc| {
         if (proc != myProc()) {
             proc.lock.acquire();
             defer proc.lock.release();
@@ -164,13 +170,8 @@ pub fn wakeup(chan: *anyopaque) void {
 
 pub fn mapStacks(kpgtbl: []usize) !void {
     for (0..procs.len) |i| {
-        var pa = try kalloc.allocPage();
+        var pa = c.kalloc();
         var va = memlayout.KSTACK(i);
-        try kvm.mapPages(kpgtbl, .{
-            .virt_addr = va,
-            .phy_addr = @intFromPtr(&pa[0]),
-            .size = mem.page_size,
-            .perm = riscv.PTE_R | riscv.PTE_W,
-        });
+        c.kvmmap(kpgtbl, va, pa, mem.page_size, riscv.PTE_R | riscv.PTE_W);
     }
 }

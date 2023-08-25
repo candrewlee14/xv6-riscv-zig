@@ -2,7 +2,28 @@ const std = @import("std");
 const mem = std.mem;
 const fmt = std.fmt;
 const SpinLock = @import("spinlock.zig");
-const console = @import("console.zig");
+// const console = @import("console.zig");
+const c = @cImport({
+    @cInclude("kernel/types.h");
+    @cInclude("kernel/param.h");
+    @cInclude("kernel/spinlock.h");
+    @cInclude("kernel/sleeplock.h");
+    @cInclude("kernel/fs.h");
+    @cInclude("kernel/file.h");
+    @cInclude("kernel/memlayout.h");
+    @cInclude("kernel/riscv.h");
+    @cInclude("kernel/defs.h");
+    @cInclude("kernel/proc.h");
+});
+
+const console = struct {
+    pub fn writeBytes(bytes: []const u8) void {
+        for (bytes) |byte| c.consputc(byte);
+    }
+    pub fn writeByte(byte: u8) void {
+        c.consputc(byte);
+    }
+};
 
 /// The errors that can occur when logging
 const LoggingError = error{};
@@ -59,6 +80,7 @@ pub export fn printf(format: [*:0]const u8, ...) void {
     @setRuntimeSafety(false);
     var need_lock = locking;
     if (need_lock) lock.acquire();
+    defer if (need_lock) lock.release();
 
     if (std.mem.span(format).len == 0) @panic("null fmt");
 
@@ -72,10 +94,10 @@ pub export fn printf(format: [*:0]const u8, ...) void {
             console.writeByte(byte);
             continue;
         }
-        var c = format[i + 1] & 0xff;
+        var ch = format[i + 1] & 0xff;
         skip_idx = i + 1;
-        if (c == 0) break;
-        switch (c) {
+        if (ch == 0) break;
+        switch (ch) {
             'd' => print("{d}", .{@cVaArg(&ap, c_int)}),
             'x' => print("{x}", .{@cVaArg(&ap, c_int)}),
             'p' => print("{p}", .{@cVaArg(&ap, *usize)}),
@@ -87,11 +109,9 @@ pub export fn printf(format: [*:0]const u8, ...) void {
             else => {
                 // Print unknown % sequence to draw attention.
                 console.writeByte('%');
-                console.writeByte(c);
+                console.writeByte(ch);
             },
         }
     }
     @cVaEnd(&ap);
-
-    if (need_lock) lock.release();
 }

@@ -1,7 +1,7 @@
 const Proc = @import("Proc.zig");
 
 // Saved registers for kernel context switches.
-pub const Context = struct {
+pub const Context = extern struct {
     ra: usize,
     sp: usize,
 

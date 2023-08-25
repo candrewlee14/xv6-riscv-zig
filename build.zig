@@ -31,7 +31,7 @@ const kernel_src = [_][]const u8{
     "src/kernel/kernelvec.S", // Handle traps from kernel, and timer interrupts.
     "src/kernel/plic.c", // RISC-V interrupt controller.
     "src/kernel/virtio_disk.c", // Disk device driver.
-    "src/kernel/kalloc.c", // Disk device driver.
+    "src/kernel/kalloc.c", // Physical page allocator.
 };
 
 const cflags = [_][]const u8{
@@ -109,7 +109,7 @@ const syscalls = [_][]const u8{
     "getpid", // Return the current processors PID.
     "sbrk", // Grow processors memory by n bytes. Returns start of new memory.
     "sleep", // Pause for n clock ticks.
-    "uptime",
+    "uptime", // Return the current time since boot in ticks.
 };
 
 pub fn build(b: *std.build.Builder) !void {
@@ -136,10 +136,8 @@ pub fn build(b: *std.build.Builder) !void {
     kernel.addIncludePath(.{ .path = "src" });
     kernel.setLinkerScriptPath(.{ .path = kernel_linker });
     kernel.code_model = .medium;
-    kernel.strip = false; // change?
+    kernel.strip = false;
     kernel.want_lto = true;
-    // kernel.rdynamic = true;
-    // kernel.compress_debug_sections = .zlib;
     b.installArtifact(kernel);
 
     const syscall_gen_step = addSyscallGen(b, &syscalls);

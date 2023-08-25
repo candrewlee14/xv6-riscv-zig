@@ -4,7 +4,7 @@ const Atomic = std.atomic.Atomic;
 const riscv = @import("riscv.zig");
 const Proc = @import("Proc.zig");
 const Cpu = @import("Cpu.zig");
-const lock_log = std.log.scoped(.spinlock);
+
 // Mutual exclusion lock.
 lock: Atomic(bool) = Atomic(bool).init(false), // Is the lock held?
 // For debugging:

@@ -1,8 +1,21 @@
 const memlayout = @import("memlayout.zig");
 const SpinLock = @import("spinlock.zig");
-const console = @import("console.zig");
+// const console = @import("console.zig");
 const log_root = @import("log.zig");
 const Proc = @import("Proc.zig");
+
+const c = @cImport({
+    @cInclude("kernel/types.h");
+    @cInclude("kernel/param.h");
+    @cInclude("kernel/spinlock.h");
+    @cInclude("kernel/sleeplock.h");
+    @cInclude("kernel/fs.h");
+    @cInclude("kernel/file.h");
+    @cInclude("kernel/memlayout.h");
+    @cInclude("kernel/riscv.h");
+    @cInclude("kernel/defs.h");
+    @cInclude("kernel/proc.h");
+});
 
 /// the UART control registers.
 /// some have different meanings for
@@ -63,7 +76,7 @@ pub fn init() void {
 // because it may block, it can't be called
 // from interrupts; it's only suitable for use
 // by write().
-pub fn putc(c: u8) void {
+pub fn putc(ch: u8) void {
     tx_lock.acquire();
     defer tx_lock.release();
 
@@ -74,7 +87,7 @@ pub fn putc(c: u8) void {
         // wait for uartstart() to open up space in the buffer.
         Proc.sleep(&tx_r, &tx_lock);
     }
-    tx_buf[tx_w % TX_BUF_SIZE] = c;
+    tx_buf[tx_w % TX_BUF_SIZE] = ch;
     tx_w += 1;
     start();
 }
@@ -83,14 +96,14 @@ pub fn putc(c: u8) void {
 // use interrupts, for use by kernel printf() and
 // to echo characters. it spins waiting for the uart's
 // output register to be empty.
-pub fn putcSync(c: u8) void {
+pub fn putcSync(ch: u8) void {
     SpinLock.pushOff();
 
     if (log_root.panicked) while (true) {};
 
     // wait for Transmit Holding Empty to be set in LSR.
     while ((readReg(LSR) & LSR_TX_IDLE) == 0) {}
-    writeReg(THR, c);
+    writeReg(THR, ch);
 
     SpinLock.popOff();
 }
@@ -113,13 +126,13 @@ pub fn start() void {
             return;
         }
 
-        var c = tx_buf[tx_r % TX_BUF_SIZE];
+        var ch = tx_buf[tx_r % TX_BUF_SIZE];
         tx_r += 1;
 
         // maybe uartputc() is waiting for space in the buffer.
         Proc.wakeup(&tx_r);
 
-        writeReg(THR, c);
+        writeReg(THR, ch);
     }
 }
 
@@ -140,8 +153,8 @@ pub fn getc() !usize {
 pub fn uartIntr() !void {
     // read and process incoming characters.
     while (true) {
-        var c = getc() catch break;
-        console.intr(c);
+        var ch = getc() catch break;
+        c.consoleintr(ch);
     }
 
     // send buffered characters.
