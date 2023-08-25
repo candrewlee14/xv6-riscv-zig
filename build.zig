@@ -52,23 +52,34 @@ const cflags = [_][]const u8{
     "-g",
 };
 
-const user_progs = [_][]const u8{
+const ProgType = enum {
+    zig,
+    c,
+};
+
+const Prog = struct {
+    type: ProgType,
+    name: []const u8,
+};
+
+const user_progs = [_]Prog{
     // "src/user/forktest.c", // ToDo: build forktest
-    "src/user/cat.c",
-    "src/user/echo.c",
-    "src/user/grep.c",
-    "src/user/init.c",
-    "src/user/kill.c",
-    "src/user/ln.c",
-    "src/user/ls.c",
-    "src/user/mkdir.c",
-    "src/user/rm.c",
-    "src/user/sh.c",
-    "src/user/stressfs.c",
-    "src/user/usertests.c",
-    "src/user/grind.c",
-    "src/user/wc.c",
-    "src/user/zombie.c",
+    .{ .type = .zig, .name = "pd" },
+    .{ .type = .c, .name = "cat" },
+    .{ .type = .c, .name = "echo" },
+    .{ .type = .c, .name = "grep" },
+    .{ .type = .c, .name = "init" },
+    .{ .type = .c, .name = "kill" },
+    .{ .type = .c, .name = "ln" },
+    .{ .type = .c, .name = "ls" },
+    .{ .type = .c, .name = "mkdir" },
+    .{ .type = .c, .name = "rm" },
+    .{ .type = .c, .name = "sh" },
+    .{ .type = .c, .name = "stressfs" },
+    .{ .type = .c, .name = "usertests" },
+    .{ .type = .c, .name = "grind" },
+    .{ .type = .c, .name = "wc" },
+    .{ .type = .c, .name = "zombie" },
 };
 
 const ulib_src = [_][]const u8{
@@ -134,15 +145,31 @@ pub fn build(b: *std.build.Builder) !void {
     const syscall_gen_step = addSyscallGen(b, &syscalls);
 
     var artifacts = std.ArrayList(*CompileStep).init(b.allocator);
-    inline for (user_progs) |src| {
-        const src_files = &[_][]const u8{src} ++ ulib_src;
-        const exe_name = "_" ++ src["src/user/".len .. src.len - 2];
-        const user_prog = b.addExecutable(.{
-            .name = exe_name,
-            .target = target,
-            .optimize = std.builtin.Mode.ReleaseSmall,
-        });
-        user_prog.addCSourceFiles(src_files, &cflags);
+    inline for (user_progs) |prog| {
+        const user_prog = blk: {
+            if (prog.type == .zig) {
+                const src = "src/user/" ++ prog.name ++ ".zig";
+                const user_prog = b.addExecutable(.{
+                    .name = prog.name,
+                    .target = target,
+                    .root_source_file = .{ .path = src },
+                    .optimize = std.builtin.Mode.ReleaseSmall,
+                });
+                user_prog.addCSourceFiles(&ulib_src, &cflags);
+                break :blk user_prog;
+            } else {
+                const src = "src/user/" ++ prog.name ++ ".c";
+                const src_files = &[_][]const u8{src} ++ ulib_src;
+                const exe_name = "_" ++ prog.name;
+                const user_prog = b.addExecutable(.{
+                    .name = exe_name,
+                    .target = target,
+                    .optimize = std.builtin.Mode.ReleaseSmall,
+                });
+                user_prog.addCSourceFiles(src_files, &cflags);
+                break :blk user_prog;
+            }
+        };
         user_prog.addCSourceFile(.{ .file = syscall_gen_step.getLazyPath(), .flags = &cflags });
         user_prog.addIncludePath(.{ .path = "src" });
         user_prog.setLinkerScriptPath(.{ .path = user_linker });
