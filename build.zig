@@ -64,7 +64,8 @@ const Prog = struct {
 
 const user_progs = [_]Prog{
     // "src/user/forktest.c", // ToDo: build forktest
-    .{ .type = .zig, .name = "pd" },
+    .{ .type = .zig, .name = "pdz" },
+    .{ .type = .c, .name = "pd" },
     .{ .type = .c, .name = "cat" },
     .{ .type = .c, .name = "echo" },
     .{ .type = .c, .name = "grep" },
