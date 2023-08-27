@@ -15,6 +15,8 @@ extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[]; // trampoline.S
 
+
+
 // Make a direct-map page table for the kernel.
 pagetable_t
 kvmmake(void)
@@ -48,6 +50,7 @@ kvmmake(void)
   
   return kpgtbl;
 }
+// extern pagetable_t kvmmake(void);
 
 // Initialize the one kernel_pagetable
 void
