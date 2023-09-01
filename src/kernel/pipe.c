@@ -8,6 +8,7 @@
 #include "sleeplock.h"
 #include "file.h"
 
+#define MIN(a,b) (((a)<(b))?(a):(b))
 #define PIPESIZE 512
 
 struct pipe {
@@ -78,6 +79,7 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
 {
   int i = 0;
   struct proc *pr = myproc();
+  // char buf[PIPESIZE];
 
   acquire(&pi->lock);
   while(i < n){
@@ -89,11 +91,41 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
       wakeup(&pi->nread);
       sleep(&pi->nwrite, &pi->lock);
     } else {
-      char ch;
-      if(copyin(pr->pagetable, &ch, addr + i, 1) == -1)
+      int avail_space = PIPESIZE - (pi->nwrite - pi->nread);
+      int n_to_write = MIN(avail_space, n - i);
+      int write_pos = pi->nwrite % PIPESIZE;
+      int bytes_until_end = PIPESIZE - write_pos;
+      int chunked_n_to_write = MIN(bytes_until_end, n_to_write);
+      if (copyin(pr->pagetable, pi->data+write_pos, addr + i, chunked_n_to_write) == -1)
         break;
-      pi->data[pi->nwrite++ % PIPESIZE] = ch;
-      i++;
+      i += chunked_n_to_write;
+      pi->nwrite += chunked_n_to_write;
+
+      // if (n_to_write > bytes_until_end) {
+      //   int diff = n_to_write - bytes_until_end;
+      //   if (copyin(pr->pagetable, pi->data, addr + i, diff) == -1)
+      //     break;
+      //   pi->nwrite += diff;
+      //   i += diff;
+      // }
+
+      //
+      // uint64 n_to_write = MIN(PIPESIZE - (pi->nwrite - pi->nread), n - i);
+      // if (copyin(pr->pagetable, buf, addr + i, n_to_write) == -1)
+      //   break;
+      // int j = 0;
+      // while (j < n_to_write) {
+      //   pi->data[pi->nwrite % PIPESIZE] = buf[j];
+      //   pi->nwrite++;
+      //   j++;
+      // }
+      // i += j;
+      //
+      // char ch;
+      // if (copyin(pr->pagetable, &ch, addr + i, 1) == -1)
+      //   break;
+      // pi->data[pi->nwrite++ % PIPESIZE] = ch;
+      // i++;
     }
   }
   wakeup(&pi->nread);
