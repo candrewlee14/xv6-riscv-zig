@@ -348,6 +348,32 @@ uvmclear(pagetable_t pagetable, uint64 va)
   *pte &= ~PTE_U;
 }
 
+void* custom_memcpy(void* dst, const void* src, int n) {
+  typedef uint64 __attribute__((__may_alias__)) u64;
+  // copy until word aligned (64-bit)
+  char* dst_pos = dst;
+  const char* src_pos = src;
+  while ((n > 0) && ((u64)dst_pos % 8 != 0)) {
+    *dst_pos++ = *src_pos++;
+    n--;
+  }
+  // copy 64-bit words
+  u64* dst_pos64 = (u64*)dst_pos;
+  const u64* src_pos64 = (const u64*)src_pos;
+  while (n >= 8) {
+    *dst_pos64++ = *src_pos64++;
+    n -= 8;
+  }
+  // copy remaining bytes
+  dst_pos = (char*)dst_pos64;
+  src_pos = (const char*)src_pos64;
+  while (n > 0) {
+    *dst_pos++ = *src_pos++;
+    n--;
+  }
+  return dst;  
+}
+
 // Copy from kernel to user.
 // Copy len bytes from src to virtual address dstva in a given page table.
 // Return 0 on success, -1 on error.
@@ -364,7 +390,7 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
-    memmove((void *)(pa0 + (dstva - va0)), src, n);
+    custom_memcpy((void *)(pa0 + (dstva - va0)), src, n);
 
     len -= n;
     src += n;
@@ -389,7 +415,7 @@ copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
     n = PGSIZE - (srcva - va0);
     if(n > len)
       n = len;
-    memmove(dst, (void *)(pa0 + (srcva - va0)), n);
+    custom_memcpy(dst, (void *)(pa0 + (srcva - va0)), n);
 
     len -= n;
     dst += n;
