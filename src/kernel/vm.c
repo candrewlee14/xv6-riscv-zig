@@ -353,7 +353,7 @@ void* custom_memcpy(void* dst, const void* src, int n) {
   // copy until word aligned (64-bit)
   char* dst_pos = dst;
   const char* src_pos = src;
-  while ((n > 0) && ((u64)dst_pos % 8 != 0)) {
+  while ((n > 0) && ((u64)dst_pos % 8 != 0) && ((u64)src_pos % 8 != 0)) {
     *dst_pos++ = *src_pos++;
     n--;
   }
