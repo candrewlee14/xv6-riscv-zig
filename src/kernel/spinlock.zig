@@ -1,7 +1,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const Atomic = std.atomic.Atomic;
-const riscv = @import("riscv.zig");
+const riscv = @import("common").riscv;
 const Proc = @import("Proc.zig");
 const Cpu = @import("Cpu.zig");
 

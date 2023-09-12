@@ -6,7 +6,7 @@ const c = @cImport({
 const std = @import("std");
 const sys = @import("../user/user.zig");
 const usr = @import("../user/user_high.zig");
-const color = @import("../user/color.zig").Color;
+const color = @import("common").color.Color;
 
 const CHUNK_LEN = 510; // for testing that non-PIPESIZE writes work
 const WRITE_AMT = 10 * 1024 * 1024;

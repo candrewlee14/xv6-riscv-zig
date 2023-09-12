@@ -2,7 +2,9 @@ const std = @import("std");
 const mem = std.mem;
 const fmt = std.fmt;
 const SpinLock = @import("spinlock.zig");
-// const console = @import("console.zig");
+const common = @import("common");
+const Color = common.color.Color;
+
 const c = @cImport({
     @cInclude("kernel/types.h");
     @cInclude("kernel/param.h");
@@ -42,6 +44,15 @@ fn logCallback(context: void, str: []const u8) LoggingError!usize {
     return str.len;
 }
 
+fn logLevelColor(lvl: std.log.Level) Color {
+    return switch (lvl) {
+        .err => .red,
+        .warn => .yellow,
+        .debug => .magenta,
+        .info => .green,
+    };
+}
+
 pub fn klogFn(
     comptime level: std.log.Level,
     comptime scope: @TypeOf(.EnumLiteral),
@@ -52,9 +63,9 @@ pub fn klogFn(
     const need_lock = locking;
     if (need_lock) lock.acquire();
 
-    const scope_prefix = "(" ++ @tagName(scope) ++ "): ";
+    const scope_prefix = "(" ++ comptime Color.dim.ttyStr() ++ @tagName(scope) ++ Color.reset.ttyStr() ++ "): ";
 
-    const prefix = "[" ++ comptime level.asText() ++ "] " ++ scope_prefix;
+    const prefix = "[" ++ comptime logLevelColor(level).ttyStr() ++ level.asText() ++ Color.reset.ttyStr() ++ "] " ++ scope_prefix;
     print(prefix ++ format ++ "\n", args);
 
     if (need_lock) lock.release();

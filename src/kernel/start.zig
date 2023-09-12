@@ -1,5 +1,5 @@
 const std = @import("std");
-const riscv = @import("riscv.zig");
+const riscv = @import("common").riscv;
 const main = @import("main.zig");
 const param = @import("param.zig");
 const memlayout = @import("memlayout.zig");
