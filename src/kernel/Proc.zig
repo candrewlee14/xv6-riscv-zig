@@ -1,6 +1,6 @@
 const std = @import("std");
 const param = @import("param.zig");
-const riscv = @import("riscv.zig");
+const riscv = @import("common").riscv;
 const Cpu = @import("Cpu.zig");
 const memlayout = @import("memlayout.zig");
 const SpinLock = @import("spinlock.zig");

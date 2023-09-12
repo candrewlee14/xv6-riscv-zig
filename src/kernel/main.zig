@@ -8,9 +8,10 @@ const c = @cImport({
 const std = @import("std");
 const log_root = @import("log.zig");
 const kmain_log = std.log.scoped(.kmain);
-const riscv = @import("riscv.zig");
+const riscv = @import("common").riscv;
 const Proc = @import("Proc.zig");
 const Atomic = std.atomic.Atomic;
+const kalloc = @import("kalloc.zig");
 
 var started = Atomic(bool).init(false);
 
@@ -18,7 +19,7 @@ pub fn kmain() void {
     if (Proc.cpuId() == 0) {
         c.consoleinit();
         kmain_log.info("xv6 kernel is booting", .{});
-        c.kinit();
+        kalloc.kinit(); // set up allocator (zig)
         c.kvminit(); // create kernel page table
         c.kvminithart(); // turn on paging
         c.procinit(); // process table
@@ -42,3 +43,10 @@ pub fn kmain() void {
     }
     c.scheduler();
 }
+
+// overrides the root page allocator
+pub const os = struct {
+    heap: struct {
+        page_allocator: std.mem.Allocator = kalloc.page_allocator,
+    },
+};

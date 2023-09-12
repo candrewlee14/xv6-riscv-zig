@@ -17,7 +17,7 @@
 // end -- start of kernel page allocation area
 // PHYSTOP -- end RAM used by the kernel
 
-const riscv = @import("riscv.zig");
+const riscv = @import("common").riscv;
 // qemu puts UART registers here in physical memory.
 pub const UART0 = 0x10000000;
 pub const UART0_IRQ = 10;

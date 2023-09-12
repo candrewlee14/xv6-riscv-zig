@@ -31,7 +31,7 @@ const kernel_src = [_][]const u8{
     "src/kernel/kernelvec.S", // Handle traps from kernel, and timer interrupts.
     "src/kernel/plic.c", // RISC-V interrupt controller.
     "src/kernel/virtio_disk.c", // Disk device driver.
-    "src/kernel/kalloc.c", // Physical page allocator.
+    // "src/kernel/kalloc.c", // Physical page allocator.
 };
 
 const cflags = [_][]const u8{
@@ -133,6 +133,7 @@ pub fn build(b: *std.build.Builder) !void {
         .target = target,
         .optimize = std.builtin.Mode.ReleaseSmall,
     });
+    kernel.addAnonymousModule("common", .{ .source_file = .{ .path = "src/common/mod.zig" } });
     kernel.addCSourceFiles(&kernel_src, &cflags);
     kernel.addIncludePath(.{ .path = "src" });
     kernel.setLinkerScriptPath(.{ .path = kernel_linker });
@@ -154,6 +155,7 @@ pub fn build(b: *std.build.Builder) !void {
                     .root_source_file = .{ .path = src },
                     .optimize = std.builtin.Mode.ReleaseSafe,
                 });
+                user_prog.addAnonymousModule("common", .{ .source_file = .{ .path = "src/common/mod.zig" } });
                 user_prog.addCSourceFiles(&ulib_src, &cflags);
                 break :blk user_prog;
             } else {
