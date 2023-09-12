@@ -84,9 +84,9 @@ const user_progs = [_]Prog{
 };
 
 const ulib_src = [_][]const u8{
-    "src/user/ulib.c",
-    "src/user/printf.c",
-    "src/user/umalloc.c",
+    "src/user/ulib/ulib.c",
+    "src/user/ulib/printf.c",
+    "src/user/ulib/umalloc.c",
 };
 
 const syscalls = [_][]const u8{
