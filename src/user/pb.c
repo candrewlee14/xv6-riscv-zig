@@ -4,7 +4,8 @@
 #include "user/user.h"
 #include "kernel/fs.h"
 
-#define CHUNK_LEN 512
+// 510 instead of 512 for testing that non-PIPESIZE writes work
+#define CHUNK_LEN 510 
 #define WRITE_AMT (10 * 1024 * 1024)
 
 int

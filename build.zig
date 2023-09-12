@@ -152,7 +152,7 @@ pub fn build(b: *std.build.Builder) !void {
                     .name = prog.name,
                     .target = target,
                     .root_source_file = .{ .path = src },
-                    .optimize = std.builtin.Mode.ReleaseSmall,
+                    .optimize = std.builtin.Mode.ReleaseSafe,
                 });
                 user_prog.addCSourceFiles(&ulib_src, &cflags);
                 break :blk user_prog;
