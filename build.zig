@@ -1,3 +1,5 @@
+// Much of this code comes from https://github.com/binarycraft007/xv6-riscv-zig
+
 const std = @import("std");
 const mem = std.mem;
 const RunStep = std.Build.RunStep;

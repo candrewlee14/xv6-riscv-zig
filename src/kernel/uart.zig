@@ -1,3 +1,5 @@
+// Much of this code comes from https://github.com/binarycraft007/xv6-riscv-zig
+
 const memlayout = @import("memlayout.zig");
 const SpinLock = @import("spinlock.zig");
 // const console = @import("console.zig");

@@ -1,3 +1,5 @@
+// Much of this code comes from https://github.com/binarycraft007/xv6-riscv-zig
+
 pub inline fn r_mhartid() usize {
     return asm volatile ("csrr a0, mhartid"
         : [ret] "={a0}" (-> usize),

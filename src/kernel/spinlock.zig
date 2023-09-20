@@ -1,3 +1,5 @@
+// Much of this code comes from https://github.com/binarycraft007/xv6-riscv-zig
+
 const std = @import("std");
 const assert = std.debug.assert;
 const Atomic = std.atomic.Atomic;
