@@ -73,7 +73,7 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     const b = self.step.owner;
 
     var full_src_paths = std.ArrayList([]const u8).init(b.allocator);
-    try full_src_paths.append("README");
+    try full_src_paths.append("README.md");
     for (self.artifacts.items) |artifact| {
         try full_src_paths.append(artifact.getOutputSource().getPath(b));
     }

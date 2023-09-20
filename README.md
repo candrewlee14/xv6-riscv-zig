@@ -1,7 +1,33 @@
-# Xv6-Riscv-Zig
+# xv6-riscv-zig
 
 This compiles the xv6-riscv project with Zig build system, and supports incrementally swapping out C code for Zig code.
 There are examples of kernel code and user programs using both C and Zig.
+
+Can build on Linux, OSX, and even Windows with only these system dependencies:
+- Zig 0.11 ([download here](https://ziglang.org/download))
+- QEMU
+
+## Usage
+
+To run the kernel in QEMU, run: `zig build -fqemu`.
+
+To run the kernel in QEMU with GDB, run: `zig build -fqemu -Dgdb`.
+
+## Adding a User Program
+
+Simply add a C or Zig file that has a `main` to the `src/user/` folder.
+Then add it to the `user_progs` array in `build.zig`. 
+```zig
+const user_progs = [_]Prog{
+    .{ .type = <YOUR PROGRAM LANGUAGE>, .name = <YOUR PROGRAM NAME> }, // <- new program
+    .{ .type = .zig, .name = "pbz" },
+    .{ .type = .c, .name = "pb" },
+    ...
+};
+```
+See the user programs pb ([C source](https://github.com/candrewlee14/xv6-riscv-zig/blob/main/src/user/pb.c)) vs. pbz ([Zig source](https://github.com/candrewlee14/xv6-riscv-zig/blob/main/src/user/pbz.zig)) for examples. 
+
+---
 
 ## Original README
 
