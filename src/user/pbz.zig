@@ -4,9 +4,9 @@ const c = @cImport({
     @cInclude("user/user.h");
 });
 const std = @import("std");
-const sys = @import("../user/user.zig");
-const usr = @import("../user/user_high.zig");
-const color = @import("common").color.Color;
+const sys = @import("./ulib/user.zig");
+const usr = @import("./ulib/user_high.zig");
+const Color = @import("common").color.Color;
 
 const CHUNK_LEN = 510; // for testing that non-PIPESIZE writes work
 const WRITE_AMT = 10 * 1024 * 1024;
@@ -69,9 +69,9 @@ export fn main() c_int {
         // This is done using some compile-time reflection magic.
         switch (err) {
             inline else => |err_val| c.printf(
-                comptime color.red.ttyStr() ++
+                comptime Color.red.ttyStr() ++
                     "ERROR: %s\n" ++
-                    color.reset.ttyStr(),
+                    Color.reset.ttyStr(),
                 @errorName(err_val),
             ),
         }

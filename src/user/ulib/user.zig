@@ -5,7 +5,7 @@ const c = @cImport({
     @cInclude("kernel/stat.h");
     @cInclude("user/user.h");
 });
-const stat = @import("../kernel/stat.zig");
+const stat = @import("common").stat;
 const std = @import("std");
 
 pub const FileDescriptor = i32;

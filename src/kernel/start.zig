@@ -3,7 +3,7 @@
 const std = @import("std");
 const riscv = @import("common").riscv;
 const main = @import("main.zig");
-const param = @import("param.zig");
+const param = @import("common").param;
 const memlayout = @import("memlayout.zig");
 const log_root = @import("log.zig");
 

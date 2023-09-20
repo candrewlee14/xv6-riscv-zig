@@ -14,8 +14,8 @@ const CompileStep = Build.CompileStep;
 const Step = Build.Step;
 
 const fs = @import("fs.zig");
-const stat = @import("stat.zig");
-const param = @import("param.zig");
+const stat = @import("../src/common/stat.zig");
+const param = @import("../src/common/param.zig");
 
 const NINODES = 200;
 

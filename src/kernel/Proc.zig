@@ -1,8 +1,9 @@
 // Much of this code comes from https://github.com/binarycraft007/xv6-riscv-zig
 
 const std = @import("std");
-const param = @import("param.zig");
-const riscv = @import("common").riscv;
+const common = @import("common");
+const param = common.param;
+const riscv = common.riscv;
 const Cpu = @import("Cpu.zig");
 const memlayout = @import("memlayout.zig");
 const SpinLock = @import("spinlock.zig");
