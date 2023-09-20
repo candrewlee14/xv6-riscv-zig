@@ -1,6 +1,6 @@
 # xv6-riscv-zig
 
-This compiles the xv6-riscv project with Zig build system, and supports incrementally swapping out C code for Zig code.
+This compiles the xv6-riscv project with the Zig build system, and supports incrementally swapping out C code for Zig code.
 There are examples of kernel code and user programs using both C and Zig.
 
 Can build on Linux, OSX, and even Windows with only these system dependencies:
@@ -9,9 +9,15 @@ Can build on Linux, OSX, and even Windows with only these system dependencies:
 
 ## Usage
 
-To run the kernel in QEMU, run: `zig build -fqemu`.
+To run the kernel in QEMU, run: 
+```bash
+zig build -fqemu
+```
 
-To run the kernel in QEMU with GDB, run: `zig build -fqemu -Dgdb`.
+To run the kernel in QEMU with GDB, run:
+```bash
+zig build -fqemu -Dgdb
+```
 
 ## Adding a User Program
 
