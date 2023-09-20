@@ -1,3 +1,10 @@
+# Xv6-Riscv-Zig
+
+This compiles the xv6-riscv project with Zig build system, and supports incrementally swapping out C code for Zig code.
+There are examples of kernel code and user programs using both C and Zig.
+
+## Original README
+
 xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
 Version 6 (v6).  xv6 loosely follows the structure and style of v6,
 but is implemented for a modern RISC-V multiprocessor using ANSI C.
