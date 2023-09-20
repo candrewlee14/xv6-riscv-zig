@@ -126,8 +126,8 @@ pub fn build(b: *std.build.Builder) !void {
     const use_gdb = b.option(bool, "gdb", "Use gdb") orelse false;
     opts.addOption(bool, "gdb", use_gdb);
 
-    const kernel_linker = "scripts/kernel.ld";
-    const user_linker = "scripts/user.ld";
+    const kernel_linker = "build/linker/kernel.ld";
+    const user_linker = "build/linker/user.ld";
 
     const kernel = b.addExecutable(.{
         .name = "kernel",
