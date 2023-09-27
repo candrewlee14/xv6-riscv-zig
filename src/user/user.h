@@ -22,6 +22,7 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int ringbuf(const char* name, int open, void** addr);
 
 // ulib.c
 int stat(const char*, struct stat*);

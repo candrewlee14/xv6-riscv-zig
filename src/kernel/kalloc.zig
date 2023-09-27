@@ -41,13 +41,15 @@ pub export fn kfree(pa: *anyopaque) void {
 }
 
 pub export fn kalloc() ?*anyopaque {
-    const page_slice_o = allocPage() catch @panic("kalloc error");
+    const page_slice_o = allocPage();
     if (page_slice_o) |pg| {
         return pg.ptr;
     } else return null;
 }
 
-pub fn freePage(pa: *align(riscv.PGSIZE) [riscv.PGSIZE]u8) !void {
+/// Frees page
+/// Failures are in the case of a bad given address
+pub fn freePage(pa: PagePtr) !void {
     const pa_u: usize = @intFromPtr(pa);
     if (pa_u % riscv.PGSIZE != 0) return error.AddressNotPageAligned;
     const end_u: usize = @intFromPtr(end);
@@ -62,7 +64,9 @@ pub fn freePage(pa: *align(riscv.PGSIZE) [riscv.PGSIZE]u8) !void {
     freelist = b;
 }
 
-pub fn allocPage() !?*align(riscv.PGSIZE) [riscv.PGSIZE]u8 {
+pub const PagePtr = *align(riscv.PGSIZE) [riscv.PGSIZE]u8;
+
+pub fn allocPage() ?PagePtr {
     lock.acquire();
     const r_o = freelist;
     if (r_o) |r| {
@@ -73,7 +77,7 @@ pub fn allocPage() !?*align(riscv.PGSIZE) [riscv.PGSIZE]u8 {
         const ptr: [*]u8 = @ptrCast(r);
         @memset(ptr[0..riscv.PGSIZE], 5);
     } else {
-        log.debug("null", .{});
+        log.warn("out of memory", .{});
         return null;
     }
     const ptr: [*]align(riscv.PGSIZE) u8 = @alignCast(@ptrCast(r_o.?));
@@ -97,9 +101,9 @@ fn alloc(_: *anyopaque, n: usize, log2_align: u8, ra: usize) ?[*]u8 {
     if (n > riscv.PGSIZE) @panic("Unimplemented: n > PGSIZE");
     const aligned_len = std.mem.alignForward(usize, n, riscv.PGSIZE);
     const page_count = aligned_len / riscv.PGSIZE;
-    var start_slice = (allocPage() catch return null) orelse return null;
+    var start_slice = allocPage() orelse return null;
     for (1..page_count) |i| {
-        var new_slice = (allocPage() catch return null) orelse {
+        var new_slice = allocPage() orelse {
             for (0..i) |j| {
                 freePage(@alignCast(start_slice.ptr[j * riscv.PGSIZE ..][0..riscv.PGSIZE])) catch @panic("Alloc failed");
             }

@@ -113,6 +113,7 @@ const syscalls = [_][]const u8{
     "sbrk", // Grow processors memory by n bytes. Returns start of new memory.
     "sleep", // Pause for n clock ticks.
     "uptime", // Return the current time since boot in ticks.
+    "ringbuf", // Ringbuf creation/deletion
 };
 
 pub fn build(b: *std.build.Builder) !void {
