@@ -69,7 +69,6 @@ const Ringbuf = extern struct {
                 return error.OutOfMemory;
             }
         }
-        self.refcount = 1;
     }
     /// Deactivates this ring buffer and frees its resources
     /// Must be holding a lock
@@ -80,6 +79,7 @@ const Ringbuf = extern struct {
             }
         }
         kalloc.freePage(self.book_page) catch unreachable;
+        self.name = null;
         self.refcount = 0;
     }
 };
@@ -94,9 +94,7 @@ pub fn findFreeRingbuf() ?*Ringbuf {
 pub fn findRingbufByName(name: []const u8) ?*Ringbuf {
     for (&ringbufs) |*rb| {
         if (rb.name) |rb_name| {
-            if (std.mem.eql(u8, name, rb_name)) {
-                return rb;
-            }
+            if (std.mem.eql(u8, name, rb_name)) return rb;
         }
     }
     return null;
@@ -110,17 +108,47 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr: **anyopaque) !void {
     if (name.len > MAX_NAME_LEN or name.len == 0) {
         return error.BadNameLength;
     }
+    const proc = c.myproc();
+    const pagetable = c.proc_pagetable(proc);
     if (op == .open) {
-        if (findRingbufByName(name)) |rb| {
-            rb.refcount += 1;
-            // TODO: map into user proc
-        } else if (findFreeRingbuf()) |rb| {
-            rb.activate();
+        const rb: *Ringbuf = blk: {
+            if (findRingbufByName(name)) |rb| {
+                std.debug.assert(rb.refcount > 0);
+                break :blk rb;
+            } else if (findFreeRingbuf()) |rb| {
+                rb.activate();
+                break :blk rb;
+            } else {
+                return error.NoFreeRingbuf;
+            }
+        };
+        rb.refcount += 1;
+        const perm = c.PTE_R | c.PTE_W | c.PTE_U;
+        for (&rb.buf_pages, 0..) |pg, i| {
+            c.mappages(
+                pagetable,
+                proc.top_free_uvm_page - i * riscv.PGSIZE,
+                riscv.PGSIZE,
+                @intFromPtr(pg),
+                perm,
+            );
+            // map it again lower
+            c.mappages(
+                pagetable,
+                proc.top_free_uvm_page - (i + rb.buf_pages.len) * riscv.PGSIZE,
+                riscv.PGSIZE,
+                @intFromPtr(pg),
+                perm,
+            );
         }
+        // TODO: map book somewhere
+        proc.top_free_uvm_page -= (2 * rb.buf_pages.len + 1) * riscv.PGSIZE;
     } else if (op == .close) {
         const rb = findRingbufByName(name) orelse return error.NameNotFound;
         rb.refcount -= 1;
-        // TODO: unmap from user proc
+        // How do we find where in the userspace this was mapped?
+        // TODO: unmap each ringbuf
+        // TODO: unmap book
         if (rb.refcount == 0) {
             rb.deactivate();
         }
