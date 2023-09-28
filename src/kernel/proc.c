@@ -55,7 +55,7 @@ procinit(void)
       initlock(&p->lock, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
-      p->top_free_uvm_page = TRAPFRAME - 2 * PGSIZE;
+      p->top_free_uvm_pg = TRAPFRAME - 2 * PGSIZE;
   }
 }
 
