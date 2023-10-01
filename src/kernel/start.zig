@@ -94,8 +94,8 @@ pub fn panic(
     error_return_trace: ?*std.builtin.StackTrace,
     _: ?usize,
 ) noreturn {
-    @setCold(true);
     _ = error_return_trace;
+    @setCold(true);
     const panic_log = std.log.scoped(.panic);
     log_root.locking = false;
     panic_log.err("{s}\n", .{msg});

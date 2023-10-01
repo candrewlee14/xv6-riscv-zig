@@ -13,12 +13,14 @@ const riscv = com.riscv;
 const SpinLock = @import("spinlock.zig");
 const kalloc = @import("kalloc.zig");
 const PagePtr = kalloc.PagePtr;
+const Book = com.ringbuf.Book;
+
+// we expose these in common because they will be used by the user lib
+const RINGBUF_SIZE = com.ringbuf.RINGBUF_SIZE;
+const MAX_NAME_LEN = com.ringbuf.MAX_NAME_LEN;
+const MAX_RINGBUFS = com.ringbuf.MAX_RINGBUFS;
 
 const RingbufManager = @This();
-
-const MAX_RINGBUFS = 10;
-const RINGBUF_SIZE = 16;
-const MAX_NAME_LEN = 16;
 
 /// Global spinlock to protect the ringbuf's array
 var spinlock: SpinLock = SpinLock.init();
@@ -32,11 +34,6 @@ pub fn init() void {
     // we want the code in this file not to be tree-shaken away by the Zig compiler.
     return;
 }
-
-const Book = extern struct {
-    read_done: u64 = 0,
-    write_done: u64 = 0,
-};
 
 const Ringbuf = struct {
     const Self = @This();
@@ -127,13 +124,13 @@ const Op = enum(u1) {
 /// Ringbuf system call
 /// - name_str: name of the ringbuf
 /// - op: open or close
-/// - addr_p: pointer to the address of the ringbuf.
+/// - addr_va: pointer to the address of the ringbuf.
 ///   On open, the address of the ringbuf is written out.
 ///   On close, the address of the ringbuf is read in.
 ///
 ///  We use the process's top_free_uvm_pg to find a slot in the userspace.
 ///  We map the ringbuf twice contiguously, and the book page right under it.
-fn ringbuf(name_str: [*:0]const u8, op: Op, addr_p: *?*anyopaque) !void {
+fn ringbuf(name_str: [*:0]const u8, op: Op, addr_va: *?*anyopaque) !void {
     spinlock.acquire();
     defer spinlock.release();
 
@@ -141,7 +138,6 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_p: *?*anyopaque) !void {
     if (name.len > MAX_NAME_LEN or name.len == 0) return error.BadNameLength;
 
     var proc: *c.struct_proc = c.myproc() orelse return error.NoProc;
-    const pagetable = c.proc_pagetable(proc);
 
     switch (op) {
         .open => {
@@ -168,7 +164,7 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_p: *?*anyopaque) !void {
                     // TODO: undo all mappings if we fail to map a page
                     if (pg == null) return error.MissingBufPage;
                     if (0 > c.mappages(
-                        pagetable,
+                        proc.pagetable,
                         proc.top_free_uvm_pg,
                         riscv.PGSIZE,
                         @intFromPtr(pg),
@@ -179,13 +175,13 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_p: *?*anyopaque) !void {
             }
             // map the book page right under the ringbuf
             if (rb.book_page == null) return error.NoBookPage;
-            _ = c.mappages(
-                pagetable,
+            if (0 > c.mappages(
+                proc.pagetable,
                 proc.top_free_uvm_pg,
                 riscv.PGSIZE,
                 @intFromPtr(rb.book_page.?),
                 perm,
-            );
+            )) return error.MappagesFailed;
             proc.top_free_uvm_pg -= riscv.PGSIZE;
             // | btm of ringbuf    |
             // | book              |
@@ -194,9 +190,9 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_p: *?*anyopaque) !void {
             // copy the address of the ringbuf into userspace
             // TODO: undo everything if we fail to copyout
             if (0 > c.copyout(
-                pagetable,
-                @intFromPtr(addr_p),
-                @ptrCast(&ringbuf_loc),
+                proc.pagetable,
+                @intFromPtr(addr_va),
+                @ptrFromInt(ringbuf_loc),
                 @sizeOf(*anyopaque),
             )) return error.CopyoutFailed;
             // leave a guard page
@@ -206,9 +202,9 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_p: *?*anyopaque) !void {
             var vaddr: ?*anyopaque = null;
             // copy the address of the ringbuf into kernel space
             if (0 > c.copyin(
-                pagetable,
+                proc.pagetable,
                 @ptrCast(&vaddr),
-                @intFromPtr(addr_p),
+                @intFromPtr(addr_va),
                 @sizeOf(?*anyopaque),
             )) return error.CopyinFailed;
             const ringbuf_vaddr: c.uint64 = @intFromPtr(vaddr orelse return error.NoAddrGiven);
@@ -218,7 +214,7 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_p: *?*anyopaque) !void {
             if (rb.book_page == null) return error.NoBookPage;
             // we subtract 1 page from addr because that points to the book
             // then we free the whole book + double mapped ringbuf at once
-            c.uvmunmap(pagetable, ringbuf_vaddr - riscv.PGSIZE, 1 + 2 * rb.buf_pages.len, 0);
+            c.uvmunmap(proc.pagetable, ringbuf_vaddr - riscv.PGSIZE, 1 + 2 * rb.buf_pages.len, 0);
             rb.refcount -= 1;
             // we choose to free the physical memory in deactivate, not in uvmunmap
             if (rb.refcount == 0) rb.deactivate();
@@ -254,7 +250,8 @@ export fn sys_ringbuf() c.uint64 {
     var open: c_int = -1;
     c.argint(1, &open);
 
-    var addr: *?*anyopaque = undefined;
+    var null_ptr: ?*anyopaque = null;
+    var addr: *?*anyopaque = &null_ptr;
     c.argaddr(2, @ptrCast(&addr));
 
     ringbuf(name_str, @enumFromInt(open), addr) catch return neg1;

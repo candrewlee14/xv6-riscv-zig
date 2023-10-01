@@ -83,6 +83,7 @@ parent: *Proc,
 kstack: u64,
 size: u64,
 pagetable: riscv.PageTable,
+top_free_uvm_pg: u64,
 trapframe: *TrapFrame,
 context: Cpu.Context,
 
