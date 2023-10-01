@@ -86,9 +86,15 @@ const user_progs = [_]Prog{
     .{ .type = .c, .name = "zombie" },
 };
 
-const ulib_src = [_][]const u8{
+const ulib_c_src = [_][]const u8{
     "src/user/ulib/ulib.c",
     "src/user/ulib/printf.c",
+    "src/user/ulib/umalloc.c",
+};
+
+const ulib_z_src = [_][]const u8{
+    "src/user/ulib/ulib.c",
+    // "src/user/ulib/printf.c",
     "src/user/ulib/umalloc.c",
 };
 
@@ -144,6 +150,7 @@ pub fn build(b: *std.build.Builder) !void {
     kernel.code_model = .medium;
     kernel.strip = false;
     kernel.want_lto = true;
+    kernel.single_threaded = true;
     b.installArtifact(kernel);
 
     const syscall_gen_step = addSyscallGen(b, &syscalls);
@@ -160,11 +167,11 @@ pub fn build(b: *std.build.Builder) !void {
                     .optimize = std.builtin.Mode.ReleaseSafe,
                 });
                 user_prog.addAnonymousModule("common", .{ .source_file = .{ .path = "src/common/mod.zig" } });
-                user_prog.addCSourceFiles(&ulib_src, &cflags);
+                user_prog.addCSourceFiles(&ulib_z_src, &cflags);
                 break :blk user_prog;
             } else {
                 const src = "src/user/" ++ prog.name ++ ".c";
-                const src_files = &[_][]const u8{src} ++ ulib_src;
+                const src_files = &[_][]const u8{src} ++ ulib_c_src;
                 const exe_name = "_" ++ prog.name;
                 const user_prog = b.addExecutable(.{
                     .name = exe_name,
@@ -175,6 +182,7 @@ pub fn build(b: *std.build.Builder) !void {
                 break :blk user_prog;
             }
         };
+        user_prog.single_threaded = true;
         user_prog.addCSourceFile(.{ .file = syscall_gen_step.getLazyPath(), .flags = &cflags });
         user_prog.addIncludePath(.{ .path = "src" });
         user_prog.setLinkerScriptPath(.{ .path = user_linker });

@@ -1,17 +1,21 @@
-const c = @cImport({
-    @cInclude("kernel/types.h");
-    @cInclude("kernel/stat.h");
-    @cInclude("user/user.h");
-});
 const std = @import("std");
 const sys = @import("./ulib/user.zig");
 const usr = @import("./ulib/user_high.zig");
 const Color = @import("common").color.Color;
+const log_root = @import("./ulib/ulog.zig");
+
+const mixin = @import("./ulib/mixin.zig");
+usingnamespace mixin.ProgMixin;
+// root overrides for std lib
+pub const std_options = mixin.std_options;
+pub const os = mixin.os;
+
+const logger = std.log.scoped(.pbz);
 
 const CHUNK_LEN = 510; // for testing that non-PIPESIZE writes work
 const WRITE_AMT = 10 * 1024 * 1024;
 
-fn zmain() !void {
+pub fn main() !void {
     // Build a chunk of CHUNK_LEN chars.
     // The contents look like this:
     //   abcdefghijklmo...
@@ -22,7 +26,7 @@ fn zmain() !void {
         }
         break :blk chunk;
     };
-    c.printf("Running benchmark...\n");
+    logger.info("Running benchmark...", .{});
 
     const pipe = try usr.Pipe.init();
     if (try sys.fork()) |pid| {
@@ -35,19 +39,19 @@ fn zmain() !void {
         while (n_read < WRITE_AMT) {
             n_read += try pipe.read(&read_buf);
             if (!std.mem.eql(u8, &read_buf, &chunk)) {
-                c.printf("The byte stream read did not match written stream!\n");
+                logger.err("The byte stream read did not match written stream!", .{});
                 return error.MismatchByteStreams;
             }
         }
         const t_after = sys.uptime();
-        c.printf("Elapsed ticks: %d\n", t_after - t_before);
+        logger.info("Elapsed ticks: {d}", .{t_after - t_before});
         var exit_status: i32 = undefined;
         if (pid != sys.wait(&exit_status)) {
-            c.printf("Unexpected child PID for wait\n");
+            logger.err("Unexpected child PID for wait", .{});
             return error.WrongChild;
         }
         if (exit_status != 0) {
-            c.printf("Child returned bad exit status: %d\n", exit_status);
+            logger.err("Child returned bad exit status: {d}", .{exit_status});
             return error.ChildError;
         }
     } else {
@@ -59,23 +63,4 @@ fn zmain() !void {
             n_written += try pipe.write(&chunk);
         }
     }
-}
-
-export fn main() c_int {
-    zmain() catch |err| {
-        // This switch case handles the possible error types from main
-        // by printing the error's name as a string.
-        // Example: @errorName(error.PipeError) => "PipeError"
-        // This is done using some compile-time reflection magic.
-        switch (err) {
-            inline else => |err_val| c.printf(
-                comptime Color.red.ttyStr() ++
-                    "ERROR: %s\n" ++
-                    Color.reset.ttyStr(),
-                @errorName(err_val),
-            ),
-        }
-        c.exit(1);
-    };
-    c.exit(0);
 }

@@ -6,7 +6,7 @@ const c = @cImport({
     @cInclude("kernel/defs.h");
 });
 const std = @import("std");
-const log_root = @import("log.zig");
+const log_root = @import("klog.zig");
 const riscv = @import("common").riscv;
 const Proc = @import("Proc.zig");
 const Atomic = std.atomic.Atomic;

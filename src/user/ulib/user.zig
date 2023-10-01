@@ -109,7 +109,7 @@ pub fn sbrk(n: i32) [*c]u8 {
 }
 // int sleep(int);
 pub fn sleep(n_ticks: i32) !void {
-    return c.sleep(@intCast(n_ticks));
+    if (0 < c.sleep(n_ticks)) return error.SleepError;
 }
 // int uptime(void);
 pub fn uptime() i32 {

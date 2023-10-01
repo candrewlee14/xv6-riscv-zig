@@ -5,7 +5,7 @@ const riscv = @import("common").riscv;
 const main = @import("main.zig");
 const param = @import("common").param;
 const memlayout = @import("memlayout.zig");
-const log_root = @import("log.zig");
+const log_root = @import("klog.zig");
 
 // a scratch area per CPU for machine-mode timer interrupts.
 var timer_scratch: [param.NCPU][5]usize = undefined;

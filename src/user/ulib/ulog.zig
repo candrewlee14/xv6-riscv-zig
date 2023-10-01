@@ -1,9 +1,9 @@
 const std = @import("std");
 const mem = std.mem;
 const fmt = std.fmt;
-const SpinLock = @import("spinlock.zig");
 const common = @import("common");
 const Color = common.color.Color;
+const sys = @import("user.zig");
 
 const c = @cImport({
     @cInclude("kernel/types.h");
@@ -18,33 +18,42 @@ const c = @cImport({
     @cInclude("kernel/proc.h");
 });
 
-const console = struct {
-    pub fn writeBytes(bytes: []const u8) void {
-        for (bytes) |byte| c.consputc(byte);
-    }
-    pub fn writeByte(byte: u8) void {
-        c.consputc(byte);
-    }
-};
-
 /// The errors that can occur when logging
 const LoggingError = error{};
 
 /// The Writer for the format function
 const Writer = std.io.Writer(void, LoggingError, logCallback);
 
-var lock: SpinLock = SpinLock{};
-pub var locking: bool = true;
-pub export var panicked: bool = false;
-
-fn logCallback(context: void, str: []const u8) LoggingError!usize {
+fn writeByte(b: u8) !void {
     // Suppress unused var warning
-    _ = context;
-    console.writeBytes(str);
-    return str.len;
+    const b_p: [*]const u8 = @ptrCast(&b);
+    _ = try sys.write(1, b_p[0..1]);
 }
 
-fn logLevelColor(lvl: std.log.Level) Color {
+fn logCallback(context: void, str: []const u8) LoggingError!usize {
+    _ = context;
+    // Suppress unused var warning
+    return sys.write(1, str) catch @panic("log write error");
+}
+
+pub fn UlogFn(
+    comptime level: std.log.Level,
+    comptime scope: @TypeOf(.EnumLiteral),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    _ = scope;
+    @setRuntimeSafety(false);
+
+    // const scope_prefix = "(" ++ comptime Color.cyan.ttyStr() ++ @tagName(scope) ++ Color.reset.ttyStr() ++ ") ";
+
+    const prefix =
+        // scope_prefix ++
+        "[" ++ comptime logLevelColor(level).ttyStr() ++ level.asText() ++ Color.reset.ttyStr() ++ "]: ";
+    print(prefix ++ format ++ "\n", args);
+}
+
+pub fn logLevelColor(lvl: std.log.Level) Color {
     return switch (lvl) {
         .err => .red,
         .warn => .yellow,
@@ -53,32 +62,26 @@ fn logLevelColor(lvl: std.log.Level) Color {
     };
 }
 
-pub fn klogFn(
-    comptime level: std.log.Level,
-    comptime scope: @TypeOf(.EnumLiteral),
-    comptime format: []const u8,
-    args: anytype,
-) void {
-    @setRuntimeSafety(false);
-    const need_lock = locking;
-    if (need_lock) lock.acquire();
+fn cPanic(s: [*:0]u8) callconv(.C) noreturn {
+    @setCold(true);
+    _ = sys.write(1, std.mem.span(s)) catch @panic("log write error");
 
-    const scope_prefix = "(" ++ comptime Color.dim.ttyStr() ++ @tagName(scope) ++ Color.reset.ttyStr() ++ "): ";
-
-    const prefix = "[" ++ comptime logLevelColor(level).ttyStr() ++ level.asText() ++ Color.reset.ttyStr() ++ "] " ++ scope_prefix;
-    print(prefix ++ format ++ "\n", args);
-
-    if (need_lock) lock.release();
+    sys.exit(1);
+}
+comptime {
+    @export(cPanic, .{ .name = "panic", .linkage = .Strong });
 }
 
-export fn panic(s: [*:0]u8) noreturn {
+pub fn panic(
+    msg: []const u8,
+    error_return_trace: ?*std.builtin.StackTrace,
+    _: ?usize,
+) noreturn {
+    _ = error_return_trace;
     @setCold(true);
-    locking = false;
-    console.writeBytes("!KERNEL PANIC!\n");
-    console.writeBytes(mem.span(s));
-    console.writeBytes("\n");
-    panicked = true; // freeze uart output from other CPUs
-    while (true) {}
+    const panic_log = std.log.scoped(.panic);
+    panic_log.err("{s}", .{msg});
+    sys.exit(1);
 }
 
 pub fn print(comptime format: []const u8, args: anytype) void {
@@ -89,10 +92,6 @@ pub fn print(comptime format: []const u8, args: anytype) void {
 
 pub export fn printf(format: [*:0]const u8, ...) void {
     @setRuntimeSafety(false);
-    var need_lock = locking;
-    if (need_lock) lock.acquire();
-    defer if (need_lock) lock.release();
-
     if (std.mem.span(format).len == 0) @panic("null fmt");
 
     var ap = @cVaStart();
@@ -102,7 +101,7 @@ pub export fn printf(format: [*:0]const u8, ...) void {
             continue;
         }
         if (byte != '%') {
-            console.writeByte(byte);
+            writeByte(byte) catch @panic("write byte failed");
             continue;
         }
         var ch = format[i + 1] & 0xff;
@@ -114,13 +113,13 @@ pub export fn printf(format: [*:0]const u8, ...) void {
             'p' => print("{p}", .{@cVaArg(&ap, *usize)}),
             's' => {
                 var s = std.mem.span(@cVaArg(&ap, [*:0]const u8));
-                console.writeBytes(s);
+                print("{s}", .{s});
             },
-            '%' => console.writeByte('%'),
+            '%' => writeByte('%') catch @panic("write byte failed"),
             else => {
                 // Print unknown % sequence to draw attention.
-                console.writeByte('%');
-                console.writeByte(ch);
+                writeByte('%') catch @panic("write byte failed");
+                writeByte(ch) catch @panic("write byte failed");
             },
         }
     }
