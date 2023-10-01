@@ -116,7 +116,7 @@ fn findRingbufByName(name: []const u8) ?*Ringbuf {
     return null;
 }
 
-const Op = enum(u1) {
+const Op = enum(u8) {
     open = 1,
     close = 0,
 };
@@ -130,7 +130,7 @@ const Op = enum(u1) {
 ///
 ///  We use the process's top_free_uvm_pg to find a slot in the userspace.
 ///  We map the ringbuf twice contiguously, and the book page right under it.
-fn ringbuf(name_str: [*:0]const u8, op: Op, addr_va: *?*anyopaque) !void {
+fn ringbuf(name_str: [*:0]const u8, op: Op, addr_va: *?*align(riscv.PGSIZE) anyopaque) !void {
     spinlock.acquire();
     defer spinlock.release();
 
@@ -191,8 +191,8 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_va: *?*anyopaque) !void {
             // TODO: undo everything if we fail to copyout
             if (0 > c.copyout(
                 proc.pagetable,
-                @intFromPtr(addr_va),
-                @ptrFromInt(ringbuf_loc),
+                @intFromPtr(addr_va), // store the ringbuf user address here
+                @intFromPtr(&ringbuf_loc), // copy from this kernel address (which holds the virtual address of the ringbuf)
                 @sizeOf(*anyopaque),
             )) return error.CopyoutFailed;
             // leave a guard page
@@ -203,8 +203,8 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_va: *?*anyopaque) !void {
             // copy the address of the ringbuf into kernel space
             if (0 > c.copyin(
                 proc.pagetable,
-                @ptrCast(&vaddr),
-                @intFromPtr(addr_va),
+                @ptrCast(&vaddr), // store the ringbuf user address here
+                @intFromPtr(addr_va), // copy from the given user address of the ringbuf user address
                 @sizeOf(?*anyopaque),
             )) return error.CopyinFailed;
             const ringbuf_vaddr: c.uint64 = @intFromPtr(vaddr orelse return error.NoAddrGiven);
@@ -254,6 +254,6 @@ export fn sys_ringbuf() c.uint64 {
     var addr: *?*anyopaque = &null_ptr;
     c.argaddr(2, @ptrCast(&addr));
 
-    ringbuf(name_str, @enumFromInt(open), addr) catch return neg1;
+    ringbuf(name_str, @enumFromInt(open), @ptrCast(addr)) catch return neg1;
     return 0;
 }
