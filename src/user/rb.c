@@ -50,8 +50,8 @@ int main(int argc, char *argv[])
     {
         int rb_desc = ringbuf_init(ringbuf_name);
 
-        XorshiftRandomCharGenerator generator;
-        xorshift_init(&generator, SEED);
+        XorshiftRandomCharGenerator gen1;
+        xorshift_init(&gen1, SEED);
 
         int n_read = 0;
         int t_before = uptime();
@@ -62,8 +62,9 @@ int main(int argc, char *argv[])
             ringbuf_start_read(rb_desc, &buf, &bytes);
             for (int i = 0; i < bytes; i++)
             {
-                if (buf[i] == xorshift_generate_char(&generator)) {
+                if (buf[i] != xorshift_generate_char(&gen1)) {
                     printf("The byte stream read did not match written stream!\n");
+                    ringbuf_deinit(rb_desc);
                     exit(1);
                 }
             }
@@ -74,6 +75,7 @@ int main(int argc, char *argv[])
         if (pid != wait(&exit_status))
         {
             printf("Unexpected child PID for wait\n");
+            ringbuf_deinit(rb_desc);
             exit(1);
         }
         int t_after = uptime();
@@ -81,6 +83,7 @@ int main(int argc, char *argv[])
         if (exit_status != 0)
         {
             printf("Child returned bad exit status: %d\n", exit_status);
+            ringbuf_deinit(rb_desc);
             exit(1);
         }
         ringbuf_deinit(rb_desc);
@@ -88,8 +91,8 @@ int main(int argc, char *argv[])
         // child
         int rb_desc = ringbuf_init(ringbuf_name);
 
-        XorshiftRandomCharGenerator generator;
-        xorshift_init(&generator, SEED);
+        XorshiftRandomCharGenerator gen2;
+        xorshift_init(&gen2, SEED);
         
         XorshiftRandomUInt64Generator size_generator;
         xorshift_uint64_init(&size_generator, SEED + 1);
@@ -101,9 +104,10 @@ int main(int argc, char *argv[])
             int bytes;
             ringbuf_start_write(rb_desc, &buf, &bytes);
             uint64 write_amt = xorshift_generate_uint64(&size_generator) % bytes;
+            // printf("write amt: %d\n", write_amt);
             for (int i = 0; i < write_amt; i++)
             {
-                buf[i] = xorshift_generate_char(&generator);
+                buf[i] = xorshift_generate_char(&gen2);
             }
             n_written += write_amt;
             ringbuf_finish_write(rb_desc, write_amt);
