@@ -15,7 +15,6 @@ pub const os = mixin.os;
 const logger = std.log.scoped(.rbz);
 
 const RAND_SEED = 42;
-const CHUNK_LEN = 512; // for testing that non-PIPESIZE writes work
 const WRITE_AMT = 10 * 1024 * 1024; // 10 MB
 
 pub fn main() !void {
@@ -34,6 +33,7 @@ pub fn main() !void {
         const t_before = sys.uptime();
         while (n_read < WRITE_AMT) {
             const buf = rb_p.startRead();
+            // if (buf.len > 0) logger.debug("Reading {d} bytes", .{buf.len});
             for (buf) |byte| {
                 if (byte != byte_rnd.int(u8)) {
                     logger.err("The byte stream read did not match written stream!", .{});
