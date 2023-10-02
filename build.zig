@@ -68,7 +68,7 @@ const user_progs = [_]Prog{
     // "src/user/forktest.c", // ToDo: build forktest
     .{ .type = .zig, .name = "rbz" },
     .{ .type = .zig, .name = "pbz" },
-    // .{ .type = .c, .name = "rb" },
+    .{ .type = .c, .name = "rb" },
     .{ .type = .c, .name = "pb" },
     .{ .type = .c, .name = "cat" },
     .{ .type = .c, .name = "echo" },
@@ -156,6 +156,17 @@ pub fn build(b: *std.build.Builder) !void {
 
     const syscall_gen_step = addSyscallGen(b, &syscalls);
 
+    const ulib = b.addStaticLibrary(.{
+        .name = "ulib",
+        .root_source_file = .{ .path = "src/user/ulib/ulib.zig" },
+        .optimize = std.builtin.Mode.ReleaseSafe,
+        .target = target,
+    });
+    ulib.single_threaded = true;
+    ulib.addAnonymousModule("common", .{ .source_file = .{ .path = "src/common/mod.zig" } });
+    ulib.addCSourceFile(.{ .file = syscall_gen_step.getLazyPath(), .flags = &cflags });
+    ulib.addIncludePath(.{ .path = "src" });
+
     var artifacts = std.ArrayList(*CompileStep).init(b.allocator);
     inline for (user_progs) |prog| {
         const user_prog = blk: {
@@ -163,10 +174,12 @@ pub fn build(b: *std.build.Builder) !void {
                 const src = "src/user/" ++ prog.name ++ ".zig";
                 const user_prog = b.addExecutable(.{
                     .name = prog.name,
-                    .target = target,
                     .root_source_file = .{ .path = src },
                     .optimize = std.builtin.Mode.ReleaseSafe,
+                    .target = target,
                 });
+                user_prog.step.dependOn(&ulib.step);
+                user_prog.linkLibrary(ulib);
                 user_prog.addAnonymousModule("common", .{ .source_file = .{ .path = "src/common/mod.zig" } });
                 user_prog.addCSourceFiles(&ulib_z_src, &cflags);
                 break :blk user_prog;
@@ -179,12 +192,14 @@ pub fn build(b: *std.build.Builder) !void {
                     .target = target,
                     .optimize = std.builtin.Mode.ReleaseSmall,
                 });
+                user_prog.step.dependOn(&ulib.step);
+                user_prog.linkLibrary(ulib);
                 user_prog.addCSourceFiles(src_files, &cflags);
                 break :blk user_prog;
             }
         };
         user_prog.single_threaded = true;
-        user_prog.addCSourceFile(.{ .file = syscall_gen_step.getLazyPath(), .flags = &cflags });
+        // user_prog.addCSourceFile(.{ .file = syscall_gen_step.getLazyPath(), .flags = &cflags });
         user_prog.addIncludePath(.{ .path = "src" });
         user_prog.setLinkerScriptPath(.{ .path = user_linker });
         user_prog.code_model = .medium;
