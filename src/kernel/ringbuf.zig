@@ -107,8 +107,7 @@ const Ringbuf = extern struct {
     /// Disowns a ringbuf from a process
     /// If the ringbuf is not owned by the process, do nothing
     /// Decrements the refcount and deactivates the ringbuf if the refcount is 0
-    pub fn disown(self: *Self, proc: *c.struct_proc) void {
-        if (self.refcount == 0) return;
+    pub fn disownIfOwned(self: *Self, proc: *c.struct_proc) void {
         const owner: *Owner = brk: {
             if (self.owners[0].proc == proc) {
                 break :brk &self.owners[0];
@@ -143,6 +142,7 @@ fn findFreeRingbuf() ?*Ringbuf {
 
 fn findRingbufByName(name: []const u8) ?*Ringbuf {
     for (&ringbufs) |*rb| {
+        if (rb.refcount == 0) continue;
         const name_str: [*:0]const u8 = @ptrCast(&rb.name_buf);
         const rb_name = std.mem.span(name_str);
         if (std.mem.eql(u8, name, rb_name)) return rb;
@@ -204,6 +204,7 @@ fn ringbuf(name_str: [*:0]const u8, op: Rb.Op, addr_va: *?*align(riscv.PGSIZE) a
             rb.refcount += 1;
             errdefer {
                 owner.proc = null;
+                rb.refcount -= 1;
                 rb.deactivate();
             }
             // map all physical pages into the process twice contiguously
@@ -282,7 +283,7 @@ fn ringbuf(name_str: [*:0]const u8, op: Rb.Op, addr_va: *?*align(riscv.PGSIZE) a
 
             // disown the ringbuf from the process
             // disown also unmaps the pages and frees the physical memory if the refcount is 0
-            rb.disown(proc);
+            rb.disownIfOwned(proc);
 
             // To help us avoid *some* fragmentation for the top_free_uvm_pg,
             // we'll bump up the top_free_uvm_pg if this is the lowest ringbuf.
@@ -338,7 +339,7 @@ fn find_owned_ringbuf(proc: *c.struct_proc) ?*Ringbuf {
 export fn ringbuf_disown_all(proc: *c.struct_proc) void {
     spinlock.acquire();
     defer spinlock.release();
-    while (find_owned_ringbuf(proc)) |rb| {
-        rb.disown(proc);
+    for (&ringbufs) |*rb| {
+        rb.disownIfOwned(proc);
     }
 }

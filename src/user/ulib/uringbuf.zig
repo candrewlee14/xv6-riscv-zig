@@ -56,12 +56,14 @@ pub const UserRingBuf = extern struct {
     }
 };
 
-pub const UringbufDescriptor = u32;
+pub const UringbufDescriptor = usize;
 
 pub fn init(name: [*:0]const u8) !UringbufDescriptor {
+    const name_str = std.mem.span(name);
     const urb_i: UringbufDescriptor = blk: {
         for (&uringbufs, 0..) |urb, i| {
-            if (urb.is_active == 0) break :blk @intCast(i);
+            if (std.mem.eql(u8, name_str, std.mem.span(urb.name))) return i;
+            if (urb.is_active == 0) break :blk i;
         }
         return error.NoFreeRingbuf;
     };

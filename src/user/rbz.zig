@@ -26,8 +26,8 @@ pub fn main() !void {
         var byte_rnd = rng.random();
 
         const rb_desc = try rb.init(rb_name);
+        defer rb.deinit(rb_desc);
         const rb_p = rb.getRingbuf(rb_desc);
-        defer rb_p.close();
 
         var n_read: usize = 0;
         const t_before = sys.uptime();
