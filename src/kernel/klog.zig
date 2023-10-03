@@ -96,9 +96,9 @@ pub export fn printf(format: [*:0]const u8, ...) void {
     if (std.mem.span(format).len == 0) @panic("null fmt");
 
     var ap = @cVaStart();
-    var skip_idx: usize = undefined;
+    var skip_idx: ?usize = null;
     for (std.mem.span(format), 0..) |byte, i| {
-        if (i == skip_idx) {
+        if (skip_idx != null and i == skip_idx.?) {
             continue;
         }
         if (byte != '%') {
