@@ -12,10 +12,8 @@ var uringbufs = [_]UserRingBuf{.{
     .is_active = 0,
 }} ** RB.MAX_RINGBUFS;
 
-const BUF_CAPACITY = riscv.PGSIZE * RB.RINGBUF_SIZE;
-
 pub const UserRingBuf = extern struct {
-    buf: *align(riscv.PGSIZE) [BUF_CAPACITY * 2]u8,
+    buf: RB.MagicBuf,
     book: *align(riscv.PGSIZE) Book,
     name: [*:0]const u8,
     is_active: c_int,
@@ -41,7 +39,7 @@ pub const UserRingBuf = extern struct {
     pub fn startRead(self: *UserRingBuf) []u8 {
         const read_done = self.book.read_done.load(.SeqCst);
         const write_done = self.book.write_done.load(.SeqCst);
-        return self.buf[read_done % BUF_CAPACITY ..][0 .. write_done - read_done];
+        return self.buf[read_done % RB.BUF_CAPACITY ..][0 .. write_done - read_done];
     }
     pub fn finishRead(self: *UserRingBuf, byte_len: u64) void {
         std.debug.assert(self.book.write_done.load(.SeqCst) - self.book.read_done.load(.SeqCst) >= byte_len);
@@ -50,10 +48,10 @@ pub const UserRingBuf = extern struct {
     pub fn startWrite(self: *UserRingBuf) []u8 {
         const read_done = self.book.read_done.load(.SeqCst);
         const write_done = self.book.write_done.load(.SeqCst);
-        return self.buf[write_done % BUF_CAPACITY ..][0 .. BUF_CAPACITY - (write_done - read_done)];
+        return self.buf[write_done % RB.BUF_CAPACITY ..][0 .. RB.BUF_CAPACITY - (write_done - read_done)];
     }
     pub fn finishWrite(self: *UserRingBuf, byte_len: u64) void {
-        std.debug.assert(self.book.write_done.load(.SeqCst) + byte_len - self.book.read_done.load(.SeqCst) <= BUF_CAPACITY);
+        std.debug.assert(self.book.write_done.load(.SeqCst) + byte_len - self.book.read_done.load(.SeqCst) <= RB.BUF_CAPACITY);
         _ = self.book.write_done.fetchAdd(byte_len, .SeqCst);
     }
 };

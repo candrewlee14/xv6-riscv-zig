@@ -14,6 +14,7 @@ const SpinLock = @import("spinlock.zig");
 const kalloc = @import("kalloc.zig");
 const PagePtr = kalloc.PagePtr;
 const Book = com.ringbuf.Book;
+const MagicBuf = com.ringbuf.MagicBuf;
 
 // we expose these in common because they will be used by the user lib
 const RINGBUF_SIZE = com.ringbuf.RINGBUF_SIZE;
@@ -35,12 +36,18 @@ pub fn init() void {
     return;
 }
 
-const Ringbuf = struct {
+const Owner = extern struct {
+    proc: ?*c.struct_proc = null,
+    vbuf: ?MagicBuf = null,
+    vbook: ?PagePtr = null,
+};
+
+const Ringbuf = extern struct {
     const Self = @This();
 
     refcount: u32 = 0,
+    owners: [2]Owner = [_]Owner{.{}} ** 2,
     name_buf: [MAX_NAME_LEN]u8 = [_]u8{0} ** MAX_NAME_LEN,
-    name: ?[]const u8 = null,
     buf_pages: [RINGBUF_SIZE]?PagePtr = [_]?PagePtr{null} ** 16,
     book_page: ?PagePtr = null,
 
@@ -51,8 +58,7 @@ const Ringbuf = struct {
         if (self.refcount > 0) return error.AlreadyActive;
         if (name.len > MAX_NAME_LEN or name.len == 0) return error.BadNameLength;
         @memcpy(&self.name_buf, name);
-        self.name = self.name_buf[0..name.len];
-        errdefer self.name = null;
+
         // allocate all the buf pages
         const alloced_page_count = blk: {
             for (&self.buf_pages, 0..) |*buf_pg_ptr, i| {
@@ -93,10 +99,38 @@ const Ringbuf = struct {
         const book_p: *Book = @ptrCast(self.book_page.?);
         book_p.* = .{};
         kalloc.freePage(self.book_page.?) catch @panic("failed to free page");
-        self.book_page = null;
-        self.name = null;
-        self.name_buf = [_]u8{0} ** MAX_NAME_LEN;
-        self.refcount = 0;
+        std.debug.assert(self.owners[0].proc == null);
+        std.debug.assert(self.owners[1].proc == null);
+        self.* = .{};
+    }
+
+    /// Disowns a ringbuf from a process
+    /// If the ringbuf is not owned by the process, do nothing
+    /// Decrements the refcount and deactivates the ringbuf if the refcount is 0
+    pub fn disown(self: *Self, proc: *c.struct_proc) void {
+        if (self.refcount == 0) return;
+        const owner: *Owner = brk: {
+            if (self.owners[0].proc == proc) {
+                break :brk &self.owners[0];
+            } else if (self.owners[1].proc == proc) {
+                break :brk &self.owners[1];
+            } else {
+                return;
+            }
+        };
+        owner.proc = null;
+        if (owner.vbuf) |vbuf| {
+            c.uvmunmap(proc.pagetable, @intFromPtr(vbuf), vbuf.len / riscv.PGSIZE, 0);
+            owner.vbuf = null;
+        } else @panic("disowning a ringbuf without a vbuf");
+        if (owner.vbook) |vbook_p| {
+            c.uvmunmap(proc.pagetable, @intFromPtr(vbook_p), 1, 0);
+            owner.vbuf = null;
+        } else @panic("disowning a ringbuf without a vbook");
+        self.refcount -= 1;
+        proc.owned_ringbufs -= 1;
+        // we choose to free the physical memory in deactivate, not in uvmunmap
+        if (self.refcount == 0) self.deactivate();
     }
 };
 
@@ -109,9 +143,9 @@ fn findFreeRingbuf() ?*Ringbuf {
 
 fn findRingbufByName(name: []const u8) ?*Ringbuf {
     for (&ringbufs) |*rb| {
-        if (rb.name) |rb_name| {
-            if (std.mem.eql(u8, name, rb_name)) return rb;
-        }
+        const name_str: [*:0]const u8 = @ptrCast(&rb.name_buf);
+        const rb_name = std.mem.span(name_str);
+        if (std.mem.eql(u8, name, rb_name)) return rb;
     }
     return null;
 }
@@ -142,20 +176,30 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_va: *?*align(riscv.PGSIZE) anyo
     switch (op) {
         .open => {
             // find the named ringbuf or activate a free slot
+            var owner: *Owner = undefined;
             const rb: *Ringbuf = blk: {
                 if (findRingbufByName(name)) |rb| {
                     std.debug.assert(rb.refcount > 0);
+                    owner = &rb.owners[1];
+                    if (rb.owners[0].proc) |orig_owner| {
+                        if (orig_owner == proc) return error.AlreadyOwner;
+                    } else return error.NoOriginalOwner;
+                    if (rb.owners[1].proc != null) return error.AlreadyTwoOwners;
                     break :blk rb;
                 } else if (findFreeRingbuf()) |rb| {
                     try rb.activate(name);
+                    owner = &rb.owners[0];
                     break :blk rb;
                 } else {
                     return error.NoFreeRingbuf;
                 }
             };
+            owner.proc = proc;
+            proc.owned_ringbufs += 1;
             rb.refcount += 1;
             errdefer {
-                if (rb.refcount > 0) rb.deactivate();
+                owner.proc = null;
+                rb.deactivate();
             }
             // map all physical pages into the process twice contiguously
             const perm = c.PTE_R | c.PTE_W | c.PTE_U;
@@ -186,7 +230,12 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_va: *?*align(riscv.PGSIZE) anyo
             // | btm of ringbuf    |
             // | book              |
             // | top_free_uvm_pg   |
+            const book_vaddr = proc.top_free_uvm_pg + 1 * riscv.PGSIZE;
             var ringbuf_loc = proc.top_free_uvm_pg + 2 * riscv.PGSIZE;
+            // store the mapped addresses
+            owner.vbook = @ptrFromInt(book_vaddr);
+            owner.vbuf = @ptrFromInt(ringbuf_loc);
+
             // copy the address of the ringbuf into userspace
             // TODO: undo everything if we fail to copyout
             if (0 > c.copyout(
@@ -207,17 +256,28 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_va: *?*align(riscv.PGSIZE) anyo
                 @intFromPtr(addr_va), // copy from the given user address of the ringbuf user address
                 @sizeOf(?*anyopaque),
             )) return error.CopyinFailed;
-            const ringbuf_vaddr: c.uint64 = @intFromPtr(vaddr orelse return error.NoAddrGiven);
+            const ringbuf_vaddr: usize = @intFromPtr(vaddr orelse return error.NoAddrGiven);
 
             const rb = findRingbufByName(name) orelse return error.NameNotFound;
+
+            const owner: *Owner = blk: {
+                if (proc == rb.owners[0].proc) {
+                    break :blk &rb.owners[0];
+                } else if (proc == rb.owners[1].proc) {
+                    break :blk &rb.owners[1];
+                } else return error.NotOwner;
+            };
+            const vbuf_u: usize = @intFromPtr(owner.vbuf);
+            const vbook_u: usize = @intFromPtr(owner.vbook);
+            if (vbuf_u != ringbuf_vaddr) return error.BadAddr;
+            if (vbook_u != ringbuf_vaddr - riscv.PGSIZE) return error.BadAddr;
+
             if (rb.refcount == 0) return error.AlreadyInactive;
             if (rb.book_page == null) return error.NoBookPage;
-            // we subtract 1 page from addr because that points to the book
-            // then we free the whole book + double mapped ringbuf at once
-            c.uvmunmap(proc.pagetable, ringbuf_vaddr - riscv.PGSIZE, 1 + 2 * rb.buf_pages.len, 0);
-            rb.refcount -= 1;
-            // we choose to free the physical memory in deactivate, not in uvmunmap
-            if (rb.refcount == 0) rb.deactivate();
+
+            // disown the ringbuf from the process
+            // disown also unmaps the pages and frees the physical memory if the refcount is 0
+            rb.disown(proc);
 
             // To help us avoid *some* fragmentation for the top_free_uvm_pg,
             // we'll bump up the top_free_uvm_pg if this is the lowest ringbuf.
@@ -256,4 +316,21 @@ export fn sys_ringbuf() c.uint64 {
 
     ringbuf(name_str, @enumFromInt(open), @ptrCast(addr)) catch return neg1;
     return 0;
+}
+
+fn find_owned_ringbuf(proc: *c.struct_proc) ?*Ringbuf {
+    for (&ringbufs) |*rb| {
+        if (rb.refcount > 0) {
+            if (rb.owners[0].proc == proc or rb.owners[1].proc == proc) return rb;
+        }
+    }
+    return null;
+}
+
+export fn ringbuf_disown_all(proc: *c.struct_proc) void {
+    spinlock.acquire();
+    defer spinlock.release();
+    while (find_owned_ringbuf(proc)) |rb| {
+        rb.disown(proc);
+    }
 }
