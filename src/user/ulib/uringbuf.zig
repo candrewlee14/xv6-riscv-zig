@@ -18,7 +18,7 @@ pub const UserRingBuf = extern struct {
     name: [*:0]const u8,
     is_active: c_int,
 
-    pub fn activate(self: *UserRingBuf, name: [*:0]const u8) !void {
+    pub fn open(self: *UserRingBuf, name: [*:0]const u8) !void {
         if (self.is_active == 1) return error.AlreadyActive;
         var buf_p: ?*anyopaque = null;
         try sys.ringbuf(name, .open, &buf_p);
@@ -31,7 +31,7 @@ pub const UserRingBuf = extern struct {
             .is_active = 1,
         };
     }
-    pub fn deactivate(self: *UserRingBuf) void {
+    pub fn close(self: *UserRingBuf) void {
         if (self.is_active == 0) @panic("uringbuf: already inactive");
         sys.ringbuf(self.name, .close, @ptrCast(&self.buf)) catch @panic("uringbuf: failed to close");
         self.is_active = 0;
@@ -65,11 +65,11 @@ pub fn init(name: [*:0]const u8) !UringbufDescriptor {
         }
         return error.NoFreeRingbuf;
     };
-    try uringbufs[urb_i].activate(name);
+    try uringbufs[urb_i].open(name);
     return urb_i;
 }
 pub fn deinit(rb_desc: UringbufDescriptor) void {
-    uringbufs[rb_desc].deactivate();
+    uringbufs[rb_desc].close();
 }
 pub fn getRingbuf(rb_desc: UringbufDescriptor) *UserRingBuf {
     return &uringbufs[rb_desc];

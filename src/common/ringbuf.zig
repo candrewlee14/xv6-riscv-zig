@@ -14,3 +14,26 @@ pub const Book = extern struct {
     read_done: Atomic(u64) = Atomic(u64).init(0),
     write_done: Atomic(u64) = Atomic(u64).init(0),
 };
+
+pub const Op = enum(u8) {
+    open = 1,
+    close = 0,
+};
+
+pub const RingbufError = error{
+    AlreadyActive,
+    AlreadyIsOwner,
+    AlreadyTwoOwners,
+    NoOriginalOwner,
+    BadNameLength,
+    OutOfMemory,
+    NoFreeRingbuf,
+    MapPagesFailed,
+    CopyOutFailed,
+    CopyInFailed,
+    NoAddrGiven,
+    NameNotFound,
+    NotOwner,
+    BadAddr,
+    AlreadyInactive,
+};

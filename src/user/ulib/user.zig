@@ -116,12 +116,8 @@ pub fn uptime() i32 {
     return c.uptime();
 }
 
-pub const OpenAction = enum(u1) {
-    open = 1,
-    close = 0,
-};
-
 // int ringbuf(const char* name, int open, void** addr);
-pub fn ringbuf(name: [*:0]const u8, open_action: OpenAction, addr: *?*anyopaque) !void {
-    if (c.ringbuf(name, @intFromEnum(open_action), addr) < 0) return error.RingbufError;
+pub fn ringbuf(name: [*:0]const u8, open_action: com.ringbuf.Op, addr: *?*anyopaque) !void {
+    const res = c.ringbuf(name, @intFromEnum(open_action), addr);
+    if (res < 0) return error.RingbufError;
 }

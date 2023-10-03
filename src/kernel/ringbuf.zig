@@ -15,6 +15,7 @@ const kalloc = @import("kalloc.zig");
 const PagePtr = kalloc.PagePtr;
 const Book = com.ringbuf.Book;
 const MagicBuf = com.ringbuf.MagicBuf;
+const Rb = com.ringbuf;
 
 // we expose these in common because they will be used by the user lib
 const RINGBUF_SIZE = com.ringbuf.RINGBUF_SIZE;
@@ -71,12 +72,12 @@ const Ringbuf = extern struct {
         // undo all allocations if we failed to allocate any of the pages
         if (alloced_page_count < self.buf_pages.len or self.book_page == null) {
             if (self.book_page != null) {
-                kalloc.freePage(self.book_page.?) catch unreachable;
+                kalloc.freePage(self.book_page.?) catch @panic("failed to free page");
                 self.book_page = null;
             }
             for (self.buf_pages[0..alloced_page_count]) |*buf_pg_ptr| {
                 const buf: PagePtr = buf_pg_ptr.*.?;
-                kalloc.freePage(buf) catch unreachable;
+                kalloc.freePage(buf) catch @panic("failed to free page");
                 buf_pg_ptr.* = null;
             }
             return error.OutOfMemory;
@@ -95,12 +96,11 @@ const Ringbuf = extern struct {
                 pg_o_p.* = null;
             }
         }
-        std.debug.assert(self.book_page != null);
+        if (self.book_page == null) @panic("deactivate: book page is already null");
         const book_p: *Book = @ptrCast(self.book_page.?);
         book_p.* = .{};
         kalloc.freePage(self.book_page.?) catch @panic("failed to free page");
-        std.debug.assert(self.owners[0].proc == null);
-        std.debug.assert(self.owners[1].proc == null);
+        if (self.owners[0].proc != null or self.owners[1].proc != null) @panic("ringbuf has owners");
         self.* = .{};
     }
 
@@ -150,11 +150,6 @@ fn findRingbufByName(name: []const u8) ?*Ringbuf {
     return null;
 }
 
-const Op = enum(u8) {
-    open = 1,
-    close = 0,
-};
-
 /// Ringbuf system call
 /// - name_str: name of the ringbuf
 /// - op: open or close
@@ -164,14 +159,14 @@ const Op = enum(u8) {
 ///
 ///  We use the process's top_free_uvm_pg to find a slot in the userspace.
 ///  We map the ringbuf twice contiguously, and the book page right under it.
-fn ringbuf(name_str: [*:0]const u8, op: Op, addr_va: *?*align(riscv.PGSIZE) anyopaque) !void {
+fn ringbuf(name_str: [*:0]const u8, op: Rb.Op, addr_va: *?*align(riscv.PGSIZE) anyopaque) Rb.RingbufError!void {
     spinlock.acquire();
     defer spinlock.release();
 
     const name: []const u8 = std.mem.span(name_str);
     if (name.len > MAX_NAME_LEN or name.len == 0) return error.BadNameLength;
 
-    var proc: *c.struct_proc = c.myproc() orelse return error.NoProc;
+    var proc: *c.struct_proc = c.myproc() orelse @panic("myproc is null");
 
     switch (op) {
         .open => {
@@ -179,15 +174,25 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_va: *?*align(riscv.PGSIZE) anyo
             var owner: *Owner = undefined;
             const rb: *Ringbuf = blk: {
                 if (findRingbufByName(name)) |rb| {
-                    std.debug.assert(rb.refcount > 0);
-                    owner = &rb.owners[1];
-                    if (rb.owners[0].proc) |orig_owner| {
-                        if (orig_owner == proc) return error.AlreadyOwner;
-                    } else return error.NoOriginalOwner;
-                    if (rb.owners[1].proc != null) return error.AlreadyTwoOwners;
+                    if (rb.refcount == 0) @panic("inactive ringbuf found by name");
+                    const owner_count = blk2: {
+                        var oc: u8 = 0;
+                        for (&rb.owners) |o| {
+                            if (o.proc) |p| {
+                                oc += 1;
+                                if (p == proc) return error.AlreadyIsOwner;
+                            }
+                        }
+                        break :blk2 oc;
+                    };
+                    if (owner_count == 0) @panic("orphaned ringbuf found by name");
+                    if (owner_count == 2) return error.AlreadyTwoOwners;
+
+                    owner = if (rb.owners[1].proc == null) &rb.owners[1] else &rb.owners[0];
                     break :blk rb;
                 } else if (findFreeRingbuf()) |rb| {
                     try rb.activate(name);
+                    if (rb.owners[0].proc != null or rb.owners[1].proc != null) @panic("free ringbuf should not have any owners");
                     owner = &rb.owners[0];
                     break :blk rb;
                 } else {
@@ -206,26 +211,26 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_va: *?*align(riscv.PGSIZE) anyo
             for (0..2) |_| {
                 for (&rb.buf_pages) |pg| {
                     // TODO: undo all mappings if we fail to map a page
-                    if (pg == null) return error.MissingBufPage;
+                    if (pg == null) @panic("buf page is null");
                     if (0 > c.mappages(
                         proc.pagetable,
                         proc.top_free_uvm_pg,
                         riscv.PGSIZE,
                         @intFromPtr(pg),
                         perm,
-                    )) return error.MappagesFailed;
+                    )) return error.MapPagesFailed;
                     proc.top_free_uvm_pg -= riscv.PGSIZE;
                 }
             }
             // map the book page right under the ringbuf
-            if (rb.book_page == null) return error.NoBookPage;
+            if (rb.book_page == null) @panic("book page is null");
             if (0 > c.mappages(
                 proc.pagetable,
                 proc.top_free_uvm_pg,
                 riscv.PGSIZE,
                 @intFromPtr(rb.book_page.?),
                 perm,
-            )) return error.MappagesFailed;
+            )) return error.MapPagesFailed;
             proc.top_free_uvm_pg -= riscv.PGSIZE;
             // | btm of ringbuf    |
             // | book              |
@@ -243,7 +248,7 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_va: *?*align(riscv.PGSIZE) anyo
                 @intFromPtr(addr_va), // store the ringbuf user address here
                 @intFromPtr(&ringbuf_loc), // copy from this kernel address (which holds the virtual address of the ringbuf)
                 @sizeOf(*anyopaque),
-            )) return error.CopyoutFailed;
+            )) return error.CopyOutFailed;
             // leave a guard page
             proc.top_free_uvm_pg -= riscv.PGSIZE;
         },
@@ -255,7 +260,7 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_va: *?*align(riscv.PGSIZE) anyo
                 @ptrCast(&vaddr), // store the ringbuf user address here
                 @intFromPtr(addr_va), // copy from the given user address of the ringbuf user address
                 @sizeOf(?*anyopaque),
-            )) return error.CopyinFailed;
+            )) return error.CopyInFailed;
             const ringbuf_vaddr: usize = @intFromPtr(vaddr orelse return error.NoAddrGiven);
 
             const rb = findRingbufByName(name) orelse return error.NameNotFound;
@@ -273,7 +278,7 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_va: *?*align(riscv.PGSIZE) anyo
             if (vbook_u != ringbuf_vaddr - riscv.PGSIZE) return error.BadAddr;
 
             if (rb.refcount == 0) return error.AlreadyInactive;
-            if (rb.book_page == null) return error.NoBookPage;
+            if (rb.book_page == null) @panic("book page is null");
 
             // disown the ringbuf from the process
             // disown also unmaps the pages and frees the physical memory if the refcount is 0
@@ -298,13 +303,14 @@ fn ringbuf(name_str: [*:0]const u8, op: Op, addr_va: *?*align(riscv.PGSIZE) anyo
 export fn sys_ringbuf() c.uint64 {
     c.begin_op();
     defer c.end_op();
-    // sys_FOO C functions return a uint64 yet return -1 on errors
-    // Zig has stricter rules about implicit casts + overflow and underflow,
-    // so we'll need to return a bitcasted -1 on errors (so it's actually the max uint64)
-    const neg1: c.uint64 = @bitCast(@as(i64, -1));
 
     var name: [MAX_NAME_LEN]u8 = [_]u8{0} ** MAX_NAME_LEN;
-    if (0 > c.argstr(0, &name, MAX_NAME_LEN)) return neg1;
+    if (0 > c.argstr(0, &name, MAX_NAME_LEN)) {
+        // sys_FOO C functions return a uint64 yet return -1 on errors
+        // Zig has stricter rules about implicit casts + overflow and underflow,
+        // so we'll need to return a bitcasted negative on errors
+        return @bitCast(-@as(isize, @intFromError(error.BadNameLength)));
+    }
     const name_str: [*:0]const u8 = @ptrCast(&name);
 
     var open: c_int = -1;
@@ -314,7 +320,9 @@ export fn sys_ringbuf() c.uint64 {
     var addr: *?*anyopaque = &null_ptr;
     c.argaddr(2, @ptrCast(&addr));
 
-    ringbuf(name_str, @enumFromInt(open), @ptrCast(addr)) catch return neg1;
+    ringbuf(name_str, @enumFromInt(open), @ptrCast(addr)) catch |err| {
+        return @bitCast(-@as(isize, @intFromError(err)));
+    };
     return 0;
 }
 

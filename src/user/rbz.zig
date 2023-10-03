@@ -27,7 +27,7 @@ pub fn main() !void {
 
         const rb_desc = try rb.init(rb_name);
         const rb_p = rb.getRingbuf(rb_desc);
-        defer rb_p.deactivate();
+        defer rb_p.close();
 
         var n_read: usize = 0;
         const t_before = sys.uptime();
@@ -65,7 +65,7 @@ pub fn main() !void {
         var n_written: usize = 0;
         const rb_desc = try rb.init(rb_name);
         const rb_p = rb.getRingbuf(rb_desc);
-        defer rb_p.deactivate();
+        defer rb_p.close();
 
         while (n_written < WRITE_AMT) {
             const buf = rb_p.startWrite();

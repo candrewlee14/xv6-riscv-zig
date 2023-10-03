@@ -68,7 +68,10 @@ const user_progs = [_]Prog{
     // "src/user/forktest.c", // ToDo: build forktest
     .{ .type = .zig, .name = "rbz" },
     .{ .type = .zig, .name = "pbz" },
-    .{ .type = .c, .name = "basic_buf_test" },
+    .{ .type = .c, .name = "rb_basic" },
+    .{ .type = .c, .name = "rb_failtest" },
+    .{ .type = .c, .name = "rb_spsc_test" },
+    .{ .type = .c, .name = "rb_wipe" },
     .{ .type = .c, .name = "rb" },
     .{ .type = .c, .name = "pb" },
     .{ .type = .c, .name = "cat" },
