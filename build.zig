@@ -203,7 +203,6 @@ pub fn build(b: *std.build.Builder) !void {
             }
         };
         user_prog.single_threaded = true;
-        // user_prog.addCSourceFile(.{ .file = syscall_gen_step.getLazyPath(), .flags = &cflags });
         user_prog.addIncludePath(.{ .path = "src" });
         user_prog.setLinkerScriptPath(.{ .path = user_linker });
         user_prog.code_model = .medium;

@@ -36,7 +36,7 @@ pub const UserRingBuf = extern struct {
         sys.ringbuf(self.name, .close, @ptrCast(&self.buf)) catch @panic("uringbuf: failed to close");
         self.is_active = 0;
     }
-    pub fn startRead(self: *UserRingBuf) []u8 {
+    pub fn startRead(self: *UserRingBuf) []const u8 {
         const read_done = self.book.read_done.load(.SeqCst);
         const write_done = self.book.write_done.load(.SeqCst);
         return self.buf[read_done % RB.BUF_CAPACITY ..][0 .. write_done - read_done];

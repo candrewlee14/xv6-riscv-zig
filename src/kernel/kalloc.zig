@@ -77,7 +77,7 @@ pub fn allocPage() ?PagePtr {
         const ptr: [*]u8 = @ptrCast(r);
         @memset(ptr[0..riscv.PGSIZE], 5);
     } else {
-        log.warn("out of memory", .{});
+        // log.warn("out of memory", .{});
         return null;
     }
     const ptr: [*]align(riscv.PGSIZE) u8 = @alignCast(@ptrCast(r_o.?));
