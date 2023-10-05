@@ -10,7 +10,7 @@ const c = @cImport({
 });
 const com = @import("common");
 const riscv = com.riscv;
-const SpinLock = @import("spinlock.zig");
+const SpinLock = @import("spinlock.zig").SpinLock;
 const kalloc = @import("kalloc.zig");
 const PagePtr = kalloc.PagePtr;
 const Book = com.ringbuf.Book;
@@ -25,16 +25,13 @@ const MAX_RINGBUFS = com.ringbuf.MAX_RINGBUFS;
 const RingbufManager = @This();
 
 /// Global spinlock to protect the ringbuf's array
-var spinlock: SpinLock = SpinLock.init();
+var spinlock: SpinLock = undefined;
 /// Global array of ringbufs
 var ringbufs: [MAX_RINGBUFS]Ringbuf = [_]Ringbuf{.{}} ** MAX_RINGBUFS;
 
 /// Set up ringbuf manager
 pub fn init() void {
-    // we do nothing here, because the spinlock and ringbufs are already initialized with defaults.
-    // but we use it from main because
-    // we want the code in this file not to be tree-shaken away by the Zig compiler.
-    return;
+    spinlock.init("ringbuf_man");
 }
 
 const Owner = extern struct {

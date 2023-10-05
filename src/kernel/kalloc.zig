@@ -1,5 +1,5 @@
 const std = @import("std");
-const SpinLock = @import("spinlock.zig");
+const SpinLock = @import("spinlock.zig").SpinLock;
 const memlayout = @import("../kernel/memlayout.zig");
 const riscv = @import("common").riscv;
 const assert = std.debug.assert;
@@ -17,7 +17,7 @@ var freelist: ?*Block = null;
 
 pub export fn kinit() void {
     log.info("setting up page allocator", .{});
-    lock = SpinLock.init();
+    lock.init("kalloc");
     freerange(@ptrCast(end), @ptrFromInt(memlayout.PHYSTOP));
 }
 
@@ -68,11 +68,11 @@ pub const PagePtr = *align(riscv.PGSIZE) [riscv.PGSIZE]u8;
 
 pub fn allocPage() ?PagePtr {
     lock.acquire();
+    defer lock.release();
     const r_o = freelist;
     if (r_o) |r| {
         freelist = r.next;
     }
-    lock.release();
     if (r_o) |r| {
         const ptr: [*]u8 = @ptrCast(r);
         @memset(ptr[0..riscv.PGSIZE], 5);

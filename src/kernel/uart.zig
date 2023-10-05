@@ -1,10 +1,9 @@
 // Much of this code comes from https://github.com/binarycraft007/xv6-riscv-zig
 
 const memlayout = @import("memlayout.zig");
-const SpinLock = @import("spinlock.zig");
+const SpinLock = @import("spinlock.zig").SpinLock;
 // const console = @import("console.zig");
 const log_root = @import("klog.zig");
-const Proc = @import("Proc.zig");
 
 const c = @cImport({
     @cInclude("kernel/types.h");
@@ -41,7 +40,7 @@ pub const LSR_TX_IDLE = 1 << 5; // THR can accept another character to send
 
 pub const TX_BUF_SIZE = 32;
 
-var tx_lock: SpinLock = SpinLock{};
+var tx_lock: SpinLock = undefined;
 var tx_buf: [TX_BUF_SIZE]u8 = [_]u8{0} ** TX_BUF_SIZE;
 var tx_w: u64 = 0; // write next to uart_tx_buf[uart_tx_w % UART_TX_BUF_SIZE]
 var tx_r: u64 = 0; // read next from uart_tx_buf[uart_tx_r % UART_TX_BUF_SIZE]
@@ -49,6 +48,7 @@ var tx_r: u64 = 0; // read next from uart_tx_buf[uart_tx_r % UART_TX_BUF_SIZE]
 pub const Error = error{NotReady};
 
 pub fn init() void {
+    tx_lock.init();
     // disable interrupts.
     writeReg(IER, 0x00);
 
@@ -87,7 +87,7 @@ pub fn putc(ch: u8) void {
     while (tx_w == tx_r + TX_BUF_SIZE) {
         // buffer is full.
         // wait for uartstart() to open up space in the buffer.
-        Proc.sleep(&tx_r, &tx_lock);
+        c.sleep(&tx_r, &tx_lock.lock);
     }
     tx_buf[tx_w % TX_BUF_SIZE] = ch;
     tx_w += 1;
@@ -99,7 +99,7 @@ pub fn putc(ch: u8) void {
 // to echo characters. it spins waiting for the uart's
 // output register to be empty.
 pub fn putcSync(ch: u8) void {
-    SpinLock.pushOff();
+    c.push_off();
 
     if (log_root.panicked) while (true) {};
 
@@ -107,7 +107,7 @@ pub fn putcSync(ch: u8) void {
     while ((readReg(LSR) & LSR_TX_IDLE) == 0) {}
     writeReg(THR, ch);
 
-    SpinLock.popOff();
+    c.pop_off();
 }
 
 /// if the UART is idle, and a character is waiting
@@ -132,7 +132,7 @@ pub fn start() void {
         tx_r += 1;
 
         // maybe uartputc() is waiting for space in the buffer.
-        Proc.wakeup(&tx_r);
+        c.wakeup(&tx_r);
 
         writeReg(THR, ch);
     }

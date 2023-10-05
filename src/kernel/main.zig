@@ -8,7 +8,6 @@ const c = @cImport({
 const std = @import("std");
 const log_root = @import("klog.zig");
 const riscv = @import("common").riscv;
-const Proc = @import("Proc.zig");
 const Atomic = std.atomic.Atomic;
 const Kalloc = @import("kalloc.zig");
 const RingbufMan = @import("ringbuf.zig");
@@ -18,7 +17,7 @@ const log = std.log.scoped(.kmain);
 var started = Atomic(bool).init(false);
 
 pub fn kmain() void {
-    if (Proc.cpuId() == 0) {
+    if (c.cpuid() == 0) {
         c.consoleinit();
         log.info("xv6 kernel is booting", .{});
         Kalloc.kinit(); // set up allocator (zig)
@@ -39,7 +38,7 @@ pub fn kmain() void {
     } else {
         while (!started.load(.SeqCst)) {}
 
-        log.info("hart {d} starting", .{Proc.cpuId()});
+        log.info("hart {d} starting", .{c.cpuid()});
         c.kvminithart(); // turn on paging
         c.trapinithart(); // install kernel trap vector
         c.plicinithart(); // ask PLIC for device interrupts

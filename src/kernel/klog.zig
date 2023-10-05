@@ -1,7 +1,7 @@
 const std = @import("std");
 const mem = std.mem;
 const fmt = std.fmt;
-const SpinLock = @import("spinlock.zig");
+const SpinLock = @import("spinlock.zig").SpinLock;
 const common = @import("common");
 const Color = common.color.Color;
 
@@ -33,7 +33,7 @@ const LoggingError = error{};
 /// The Writer for the format function
 const Writer = std.io.Writer(void, LoggingError, logCallback);
 
-var lock: SpinLock = SpinLock{};
+var lock: SpinLock = SpinLock{ .lock = .{} };
 pub var locking: bool = true;
 pub export var panicked: bool = false;
 
