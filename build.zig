@@ -73,6 +73,7 @@ const user_progs = [_]Prog{
     .{ .type = .c, .name = "rb_failtest" },
     .{ .type = .c, .name = "rb_spsc_test" },
     .{ .type = .c, .name = "rb_wipe" },
+    .{ .type = .c, .name = "rb_open_close" },
     .{ .type = .c, .name = "rb" },
     .{ .type = .c, .name = "pb" },
     .{ .type = .c, .name = "cat" },
