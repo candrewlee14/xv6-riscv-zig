@@ -37,3 +37,21 @@ pub const RingbufError = error{
     BadAddr,
     AlreadyInactive,
 };
+
+pub fn intFromErr(comptime ErrT: type, err: ErrT) isize {
+    const fields = comptime std.meta.fields(ErrT);
+    inline for (fields, 1..) |field, iu| {
+        const i: isize = @intCast(iu);
+        if (err == @field(ErrT, field.name)) return -i;
+    }
+    unreachable;
+}
+
+pub fn errFromInt(comptime ErrT: type, val: isize) ErrT {
+    const fields = comptime std.meta.fields(ErrT);
+    inline for (fields, 1..) |field, iu| {
+        const i: isize = @intCast(iu);
+        if (val == -i) return @field(ErrT, field.name);
+    }
+    @panic("bad error value");
+}

@@ -86,7 +86,7 @@ pub export fn ringbuf_deinit(rb_desc: c_int) void {
 
 export fn ringbuf_start_read(ring_desc: c_int, addr: *?*c_char, bytes: *c_int) void {
     const buf = uringbufs[@intCast(ring_desc)].startRead();
-    addr.* = @ptrCast(buf.ptr);
+    addr.* = @constCast(@ptrCast(buf.ptr));
     bytes.* = @intCast(buf.len);
 }
 

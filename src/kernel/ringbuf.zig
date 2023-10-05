@@ -259,9 +259,9 @@ fn ringbuf(name_str: [*:0]const u8, op: Rb.Op, addr_va: *?*align(riscv.PGSIZE) a
                 @intFromPtr(addr_va), // copy from the given user address of the ringbuf user address
                 @sizeOf(?*anyopaque),
             )) return error.CopyInFailed;
-            const ringbuf_vaddr: usize = @intFromPtr(vaddr orelse return error.NoAddrGiven);
 
             const rb = findRingbufByName(name) orelse return error.NameNotFound;
+            const ringbuf_vaddr: usize = @intFromPtr(vaddr orelse return error.NoAddrGiven);
 
             const owner: *Owner = blk: {
                 if (proc == rb.owners[0].proc) {
@@ -307,7 +307,7 @@ export fn sys_ringbuf() c.uint64 {
         // sys_FOO C functions return a uint64 yet return -1 on errors
         // Zig has stricter rules about implicit casts + overflow and underflow,
         // so we'll need to return a bitcasted negative on errors
-        return @bitCast(-@as(isize, @intFromError(error.BadNameLength)));
+        return @bitCast(com.ringbuf.intFromErr(com.ringbuf.RingbufError, error.BadNameLength));
     }
     const name_str: [*:0]const u8 = @ptrCast(&name);
 
@@ -319,7 +319,7 @@ export fn sys_ringbuf() c.uint64 {
     c.argaddr(2, @ptrCast(&addr));
 
     ringbuf(name_str, @enumFromInt(open), @ptrCast(addr)) catch |err| {
-        return @bitCast(-@as(isize, @intFromError(err)));
+        return @bitCast(com.ringbuf.intFromErr(com.ringbuf.RingbufError, err));
     };
     return 0;
 }

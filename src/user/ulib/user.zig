@@ -117,7 +117,7 @@ pub fn uptime() i32 {
 }
 
 // int ringbuf(const char* name, int open, void** addr);
-pub fn ringbuf(name: [*:0]const u8, open_action: com.ringbuf.Op, addr: *?*anyopaque) !void {
+pub fn ringbuf(name: [*:0]const u8, open_action: com.ringbuf.Op, addr: *?*anyopaque) com.ringbuf.RingbufError!void {
     const res = c.ringbuf(name, @intFromEnum(open_action), addr);
-    if (res < 0) return error.RingbufError;
+    if (res < 0) return com.ringbuf.errFromInt(com.ringbuf.RingbufError, @intCast(res));
 }

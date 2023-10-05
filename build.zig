@@ -67,6 +67,7 @@ const Prog = struct {
 const user_progs = [_]Prog{
     // "src/user/forktest.c", // ToDo: build forktest
     .{ .type = .zig, .name = "rbz" },
+    .{ .type = .zig, .name = "rbz_failtest" },
     .{ .type = .zig, .name = "pbz" },
     .{ .type = .c, .name = "rb_basic" },
     .{ .type = .c, .name = "rb_failtest" },
