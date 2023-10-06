@@ -1,4 +1,7 @@
 const sys = @import("user.zig");
+const com = @import("common");
+const riscv = com.riscv;
+const Book = com.ringbuf.Book;
 
 pub const Pipe = packed struct {
     read_fd: sys.FileDescriptor,

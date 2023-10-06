@@ -112,27 +112,28 @@ piperead(struct pipe *pi, uint64 addr, int n)
 {
   struct proc *pr = myproc();
   acquire(&pi->lock);
+  while(pi->nread == pi->nwrite && pi->writeopen){  //DOC: pipe-empty
+    if(killed(pr)){
+      release(&pi->lock);
+      return -1;
+    }
+    sleep(&pi->nread, &pi->lock); //DOC: piperead-sleep
+  } 
   int i = 0;
   while (i < n) {  //DOC: piperead-copy
-    if(pi->nread == pi->nwrite && pi->writeopen){  //DOC: pipe-empty
-      if(killed(pr)){
-        release(&pi->lock);
-        return -1;
-      }
-      sleep(&pi->nread, &pi->lock); //DOC: piperead-sleep
-    } else {
-      int remaining = pi->nwrite - pi->nread;
-      int n_to_read = MIN(remaining, n - i);
-      int read_pos = pi->nread % PIPESIZE;
-      int bytes_until_end = PIPESIZE - read_pos;
-      int chunked_n_to_read = MIN(n_to_read, bytes_until_end);
-      if(copyout(pr->pagetable, addr + i, pi->data + read_pos, chunked_n_to_read) == -1)
-        break;
-      i += chunked_n_to_read;
-      pi->nread += chunked_n_to_read;
-    }
+    int remaining = pi->nwrite - pi->nread;
+    if (remaining == 0) break;
+    int n_to_read = MIN(remaining, n - i);
+    int read_pos = pi->nread % PIPESIZE;
+    int bytes_until_end = PIPESIZE - read_pos;
+    int chunked_n_to_read = MIN(n_to_read, bytes_until_end);
+    if(copyout(pr->pagetable, addr + i, pi->data + read_pos, chunked_n_to_read) == -1)
+      break;
+    i += chunked_n_to_read;
+    pi->nread += chunked_n_to_read;
   }
   wakeup(&pi->nwrite);  //DOC: piperead-wakeup
   release(&pi->lock);
   return i;
 }
+

@@ -5,7 +5,8 @@ const c = @cImport({
     @cInclude("kernel/stat.h");
     @cInclude("user/user.h");
 });
-const stat = @import("common").stat;
+const com = @import("common");
+const stat = com.stat;
 const std = @import("std");
 
 pub const FileDescriptor = i32;
@@ -108,26 +109,15 @@ pub fn sbrk(n: i32) [*c]u8 {
 }
 // int sleep(int);
 pub fn sleep(n_ticks: i32) !void {
-    return c.sleep(@intCast(n_ticks));
+    if (c.sleep(n_ticks) < 0) return error.SleepError;
 }
 // int uptime(void);
 pub fn uptime() i32 {
     return c.uptime();
 }
-//
-// // ulib.c
-// int stat(const char*, struct stat*);
-// char* strcpy(char*, const char*);
-// void *memmove(void*, const void*, int);
-// char* strchr(const char*, char c);
-// int strcmp(const char*, const char*);
-// void fprintf(int, const char*, ...);
-// void printf(const char*, ...);
-// char* gets(char*, int max);
-// uint strlen(const char*);
-// void* memset(void*, int, uint);
-// void* malloc(uint);
-// void free(void*);
-// int atoi(const char*);
-// int memcmp(const void *, const void *, uint);
-// void *memcpy(void *, const void *, uint);
+
+// int ringbuf(const char* name, int open, void** addr);
+pub fn ringbuf(name: [*:0]const u8, open_action: com.ringbuf.Op, addr: *?*anyopaque) com.ringbuf.RingbufError!void {
+    const res = c.ringbuf(name, @intFromEnum(open_action), addr);
+    if (res < 0) return com.ringbuf.errFromInt(com.ringbuf.RingbufError, @intCast(res));
+}

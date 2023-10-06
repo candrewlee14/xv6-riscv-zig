@@ -66,7 +66,14 @@ const Prog = struct {
 
 const user_progs = [_]Prog{
     // "src/user/forktest.c", // ToDo: build forktest
+    .{ .type = .zig, .name = "rbz" },
+    .{ .type = .zig, .name = "rbz_failtest" },
     .{ .type = .zig, .name = "pbz" },
+    .{ .type = .c, .name = "rb_basic" },
+    .{ .type = .c, .name = "rb_failtest" },
+    .{ .type = .c, .name = "rb_spsc_test" },
+    .{ .type = .c, .name = "rb_wipe" },
+    .{ .type = .c, .name = "rb" },
     .{ .type = .c, .name = "pb" },
     .{ .type = .c, .name = "cat" },
     .{ .type = .c, .name = "echo" },
@@ -85,9 +92,15 @@ const user_progs = [_]Prog{
     .{ .type = .c, .name = "zombie" },
 };
 
-const ulib_src = [_][]const u8{
+const ulib_c_src = [_][]const u8{
     "src/user/ulib/ulib.c",
     "src/user/ulib/printf.c",
+    "src/user/ulib/umalloc.c",
+};
+
+const ulib_z_src = [_][]const u8{
+    "src/user/ulib/ulib.c",
+    // "src/user/ulib/printf.c",
     "src/user/ulib/umalloc.c",
 };
 
@@ -113,6 +126,7 @@ const syscalls = [_][]const u8{
     "sbrk", // Grow processors memory by n bytes. Returns start of new memory.
     "sleep", // Pause for n clock ticks.
     "uptime", // Return the current time since boot in ticks.
+    "ringbuf", // Ringbuf creation/deletion
 };
 
 pub fn build(b: *std.build.Builder) !void {
@@ -142,9 +156,21 @@ pub fn build(b: *std.build.Builder) !void {
     kernel.code_model = .medium;
     kernel.strip = false;
     kernel.want_lto = true;
+    kernel.single_threaded = true;
     b.installArtifact(kernel);
 
     const syscall_gen_step = addSyscallGen(b, &syscalls);
+
+    const ulib = b.addStaticLibrary(.{
+        .name = "ulib",
+        .root_source_file = .{ .path = "src/user/ulib/ulib.zig" },
+        .optimize = std.builtin.Mode.ReleaseSafe,
+        .target = target,
+    });
+    ulib.single_threaded = true;
+    ulib.addAnonymousModule("common", .{ .source_file = .{ .path = "src/common/mod.zig" } });
+    ulib.addCSourceFile(.{ .file = syscall_gen_step.getLazyPath(), .flags = &cflags });
+    ulib.addIncludePath(.{ .path = "src" });
 
     var artifacts = std.ArrayList(*CompileStep).init(b.allocator);
     inline for (user_progs) |prog| {
@@ -153,27 +179,31 @@ pub fn build(b: *std.build.Builder) !void {
                 const src = "src/user/" ++ prog.name ++ ".zig";
                 const user_prog = b.addExecutable(.{
                     .name = prog.name,
-                    .target = target,
                     .root_source_file = .{ .path = src },
                     .optimize = std.builtin.Mode.ReleaseSafe,
+                    .target = target,
                 });
+                user_prog.step.dependOn(&ulib.step);
+                user_prog.linkLibrary(ulib);
                 user_prog.addAnonymousModule("common", .{ .source_file = .{ .path = "src/common/mod.zig" } });
-                user_prog.addCSourceFiles(&ulib_src, &cflags);
+                user_prog.addCSourceFiles(&ulib_z_src, &cflags);
                 break :blk user_prog;
             } else {
                 const src = "src/user/" ++ prog.name ++ ".c";
-                const src_files = &[_][]const u8{src} ++ ulib_src;
+                const src_files = &[_][]const u8{src} ++ ulib_c_src;
                 const exe_name = "_" ++ prog.name;
                 const user_prog = b.addExecutable(.{
                     .name = exe_name,
                     .target = target,
                     .optimize = std.builtin.Mode.ReleaseSmall,
                 });
+                user_prog.step.dependOn(&ulib.step);
+                user_prog.linkLibrary(ulib);
                 user_prog.addCSourceFiles(src_files, &cflags);
                 break :blk user_prog;
             }
         };
-        user_prog.addCSourceFile(.{ .file = syscall_gen_step.getLazyPath(), .flags = &cflags });
+        user_prog.single_threaded = true;
         user_prog.addIncludePath(.{ .path = "src" });
         user_prog.setLinkerScriptPath(.{ .path = user_linker });
         user_prog.code_model = .medium;

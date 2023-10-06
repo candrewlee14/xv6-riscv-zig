@@ -103,11 +103,11 @@ fprintf(int fd, const char *fmt, ...)
   vprintf(fd, fmt, ap);
 }
 
-void
-printf(const char *fmt, ...)
-{
-  va_list ap;
-
-  va_start(ap, fmt);
-  vprintf(1, fmt, ap);
-}
+// void
+// printf(const char *fmt, ...)
+// {
+//   va_list ap;
+//
+//   va_start(ap, fmt);
+//   vprintf(1, fmt, ap);
+// }

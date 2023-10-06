@@ -5,7 +5,7 @@ const riscv = @import("common").riscv;
 const main = @import("main.zig");
 const param = @import("common").param;
 const memlayout = @import("memlayout.zig");
-const log_root = @import("log.zig");
+const log_root = @import("klog.zig");
 
 // a scratch area per CPU for machine-mode timer interrupts.
 var timer_scratch: [param.NCPU][5]usize = undefined;
@@ -94,8 +94,8 @@ pub fn panic(
     error_return_trace: ?*std.builtin.StackTrace,
     _: ?usize,
 ) noreturn {
-    @setCold(true);
     _ = error_return_trace;
+    @setCold(true);
     const panic_log = std.log.scoped(.panic);
     log_root.locking = false;
     panic_log.err("{s}\n", .{msg});

@@ -18,6 +18,9 @@ struct spinlock pid_lock;
 extern void forkret(void);
 static void freeproc(struct proc *p);
 
+extern void ringbuf_disown_all(struct proc *p );
+
+
 extern char trampoline[]; // trampoline.S
 
 // helps ensure that wakeups of wait()ing
@@ -55,6 +58,7 @@ procinit(void)
       initlock(&p->lock, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
+      p->top_free_uvm_pg = TRAPFRAME - 2 * PGSIZE;
   }
 }
 
@@ -154,14 +158,18 @@ found:
 // p->lock must be held.
 static void
 freeproc(struct proc *p)
-{
+{ 
+  if (p->owned_ringbufs > 0)
+    ringbuf_disown_all(p);
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
+  p->top_free_uvm_pg = TRAPFRAME - 2 * PGSIZE;
   p->sz = 0;
+  p->owned_ringbufs = 0;
   p->pid = 0;
   p->parent = 0;
   p->name[0] = 0;

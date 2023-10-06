@@ -1,7 +1,7 @@
 const std = @import("std");
 const mem = std.mem;
 const fmt = std.fmt;
-const SpinLock = @import("spinlock.zig");
+const SpinLock = @import("spinlock.zig").SpinLock;
 const common = @import("common");
 const Color = common.color.Color;
 
@@ -33,7 +33,7 @@ const LoggingError = error{};
 /// The Writer for the format function
 const Writer = std.io.Writer(void, LoggingError, logCallback);
 
-var lock: SpinLock = SpinLock{};
+var lock: SpinLock = SpinLock{ .lock = .{} };
 pub var locking: bool = true;
 pub export var panicked: bool = false;
 
@@ -63,9 +63,9 @@ pub fn klogFn(
     const need_lock = locking;
     if (need_lock) lock.acquire();
 
-    const scope_prefix = "(" ++ comptime Color.dim.ttyStr() ++ @tagName(scope) ++ Color.reset.ttyStr() ++ "): ";
+    const scope_prefix = "(" ++ comptime Color.dim.ttyStr() ++ @tagName(scope) ++ Color.reset.ttyStr() ++ ") ";
 
-    const prefix = "[" ++ comptime logLevelColor(level).ttyStr() ++ level.asText() ++ Color.reset.ttyStr() ++ "] " ++ scope_prefix;
+    const prefix = scope_prefix ++ "[" ++ comptime logLevelColor(level).ttyStr() ++ level.asText() ++ Color.reset.ttyStr() ++ "]: ";
     print(prefix ++ format ++ "\n", args);
 
     if (need_lock) lock.release();
@@ -96,9 +96,9 @@ pub export fn printf(format: [*:0]const u8, ...) void {
     if (std.mem.span(format).len == 0) @panic("null fmt");
 
     var ap = @cVaStart();
-    var skip_idx: usize = undefined;
+    var skip_idx: ?usize = null;
     for (std.mem.span(format), 0..) |byte, i| {
-        if (i == skip_idx) {
+        if (skip_idx != null and i == skip_idx.?) {
             continue;
         }
         if (byte != '%') {
