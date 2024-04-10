@@ -1,5 +1,5 @@
 const std = @import("std");
-const Atomic = std.atomic.Atomic;
+const Atomic = std.atomic.Value;
 const riscv = @import("./riscv.zig");
 
 pub const RINGBUF_SIZE = 16;

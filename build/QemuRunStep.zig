@@ -4,9 +4,9 @@ const std = @import("std");
 const mem = std.mem;
 const Build = std.Build;
 const Step = Build.Step;
-const CompileStep = Build.CompileStep;
+const CompileStep = Build.Step.Compile;
 const MakeFilesystemStep = @import("MakeFilesystemStep.zig");
-const RunStep = Build.RunStep;
+const RunStep = Build.Step.Run;
 
 const QemuRunStep = @This();
 
@@ -59,7 +59,7 @@ pub fn create(
 
 fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     _ = prog_node;
-    const self = @fieldParentPtr(QemuRunStep, "step", step);
+    const self: *QemuRunStep = @alignCast(@fieldParentPtr("step", step));
 
     if (!self.step.owner.enable_qemu) {
         return;
@@ -91,14 +91,14 @@ fn make(step: *Step, prog_node: *std.Progress.Node) !void {
         });
     }
 
-    const kernel_path = self.kernel.getOutputSource().getPath(self.step.owner);
+    const kernel_path = self.kernel.getEmittedBin().getPath(self.step.owner);
     try argv_list.appendSlice(&[_][]const u8{
         "-kernel",
         kernel_path,
     });
 
     const image_path = self.image.getOutputSource().getPath(self.step.owner);
-    var drive_arg = try mem.concat(self.step.owner.allocator, u8, &[_][]const u8{
+    const drive_arg = try mem.concat(self.step.owner.allocator, u8, &[_][]const u8{
         "file=",
         image_path,
         ",if=none,format=raw,id=x0",

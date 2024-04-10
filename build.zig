@@ -2,9 +2,9 @@
 
 const std = @import("std");
 const mem = std.mem;
-const RunStep = std.Build.RunStep;
-const CompileStep = std.Build.CompileStep;
-const InstallFileStep = std.Build.InstallFileStep;
+const RunStep = std.Build.Step.Run;
+const CompileStep = std.Build.Step.Compile;
+const InstallFileStep = std.Build.Step.InstallFile;
 const MakeFilesystemStep = @import("build/MakeFilesystemStep.zig");
 const SyscallGenStep = @import("build/SyscallGenStep.zig");
 const QemuRunStep = @import("build/QemuRunStep.zig");
@@ -130,12 +130,13 @@ const syscalls = [_][]const u8{
     "ringbuf", // Ringbuf creation/deletion
 };
 
-pub fn build(b: *std.build.Builder) !void {
-    const target = std.zig.CrossTarget{
+pub fn build(b: *std.Build) !void {
+    const target_query = std.Target.Query{
         .os_tag = .freestanding,
         .cpu_arch = .riscv64,
         .abi = .none,
     };
+    const target = b.resolveTargetQuery(target_query);
 
     const opts = b.addOptions();
     const use_gdb = b.option(bool, "gdb", "Use gdb") orelse false;
@@ -150,14 +151,14 @@ pub fn build(b: *std.build.Builder) !void {
         .target = target,
         .optimize = std.builtin.Mode.ReleaseSmall,
     });
-    kernel.addAnonymousModule("common", .{ .source_file = .{ .path = "src/common/mod.zig" } });
-    kernel.addCSourceFiles(&kernel_src, &cflags);
+    kernel.root_module.addAnonymousImport("common", .{ .root_source_file = .{ .path = "src/common/mod.zig" } });
+    kernel.addCSourceFiles(.{ .files = &kernel_src, .flags = &cflags });
     kernel.addIncludePath(.{ .path = "src" });
-    kernel.setLinkerScriptPath(.{ .path = kernel_linker });
-    kernel.code_model = .medium;
-    kernel.strip = false;
+    kernel.setLinkerScript(.{ .path = kernel_linker });
+    kernel.root_module.strip = false;
+    kernel.root_module.single_threaded = true;
+    kernel.root_module.code_model = .medium;
     kernel.want_lto = true;
-    kernel.single_threaded = true;
     b.installArtifact(kernel);
 
     const syscall_gen_step = addSyscallGen(b, &syscalls);
@@ -168,8 +169,8 @@ pub fn build(b: *std.build.Builder) !void {
         .optimize = std.builtin.Mode.ReleaseSafe,
         .target = target,
     });
-    ulib.single_threaded = true;
-    ulib.addAnonymousModule("common", .{ .source_file = .{ .path = "src/common/mod.zig" } });
+    ulib.root_module.single_threaded = true;
+    ulib.root_module.addAnonymousImport("common", .{ .root_source_file = .{ .path = "src/common/mod.zig" } });
     ulib.addCSourceFile(.{ .file = syscall_gen_step.getLazyPath(), .flags = &cflags });
     ulib.addIncludePath(.{ .path = "src" });
 
@@ -186,8 +187,8 @@ pub fn build(b: *std.build.Builder) !void {
                 });
                 user_prog.step.dependOn(&ulib.step);
                 user_prog.linkLibrary(ulib);
-                user_prog.addAnonymousModule("common", .{ .source_file = .{ .path = "src/common/mod.zig" } });
-                user_prog.addCSourceFiles(&ulib_z_src, &cflags);
+                user_prog.root_module.addAnonymousImport("common", .{ .root_source_file = .{ .path = "src/common/mod.zig" } });
+                user_prog.addCSourceFiles(.{ .files = &ulib_z_src, .flags = &cflags });
                 break :blk user_prog;
             } else {
                 const src = "src/user/" ++ prog.name ++ ".c";
@@ -200,14 +201,14 @@ pub fn build(b: *std.build.Builder) !void {
                 });
                 user_prog.step.dependOn(&ulib.step);
                 user_prog.linkLibrary(ulib);
-                user_prog.addCSourceFiles(src_files, &cflags);
+                user_prog.addCSourceFiles(.{ .files = src_files, .flags = &cflags });
                 break :blk user_prog;
             }
         };
-        user_prog.single_threaded = true;
         user_prog.addIncludePath(.{ .path = "src" });
-        user_prog.setLinkerScriptPath(.{ .path = user_linker });
-        user_prog.code_model = .medium;
+        user_prog.setLinkerScript(.{ .path = user_linker });
+        user_prog.root_module.single_threaded = true;
+        user_prog.root_module.code_model = .medium;
         user_prog.step.dependOn(&syscall_gen_step.step);
         b.installArtifact(user_prog);
         try artifacts.append(user_prog);

@@ -89,7 +89,7 @@ pub fn print(comptime format: []const u8, args: anytype) void {
 
 pub export fn printf(format: [*:0]const u8, ...) void {
     @setRuntimeSafety(false);
-    var need_lock = locking;
+    const need_lock = locking;
     if (need_lock) lock.acquire();
     defer if (need_lock) lock.release();
 
@@ -105,7 +105,7 @@ pub export fn printf(format: [*:0]const u8, ...) void {
             console.writeByte(byte);
             continue;
         }
-        var ch = format[i + 1] & 0xff;
+        const ch = format[i + 1] & 0xff;
         skip_idx = i + 1;
         if (ch == 0) break;
         switch (ch) {
@@ -113,7 +113,7 @@ pub export fn printf(format: [*:0]const u8, ...) void {
             'x' => print("{x}", .{@cVaArg(&ap, c_int)}),
             'p' => print("{p}", .{@cVaArg(&ap, *usize)}),
             's' => {
-                var s = std.mem.span(@cVaArg(&ap, [*:0]const u8));
+                const s = std.mem.span(@cVaArg(&ap, [*:0]const u8));
                 console.writeBytes(s);
             },
             '%' => console.writeByte('%'),
