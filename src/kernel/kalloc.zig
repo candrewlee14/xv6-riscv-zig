@@ -103,7 +103,7 @@ fn alloc(_: *anyopaque, n: usize, log2_align: u8, ra: usize) ?[*]u8 {
     const page_count = aligned_len / riscv.PGSIZE;
     var start_slice = allocPage() orelse return null;
     for (1..page_count) |i| {
-        var new_slice = allocPage() orelse {
+        const new_slice = allocPage() orelse {
             for (0..i) |j| {
                 freePage(@alignCast(start_slice.ptr[j * riscv.PGSIZE ..][0..riscv.PGSIZE])) catch @panic("Alloc failed");
             }

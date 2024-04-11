@@ -3,7 +3,7 @@
 const std = @import("std");
 const mem = std.mem;
 const SyscallGenStep = @This();
-const Step = std.build.Step;
+const Step = std.Build.Step;
 
 step: Step,
 output_file: std.Build.GeneratedFile,
@@ -31,11 +31,11 @@ pub fn getLazyPath(self: *SyscallGenStep) std.Build.LazyPath {
 fn make(step: *Step, prog_node: *std.Progress.Node) !void {
     _ = prog_node;
     const b = step.owner;
-    const self = @fieldParentPtr(SyscallGenStep, "step", step);
+    const self: *SyscallGenStep = @fieldParentPtr("step", step);
     const gpa = b.allocator;
     const arena = b.allocator;
 
-    var man = b.cache.obtain();
+    var man = b.graph.cache.obtain();
     defer man.deinit();
 
     // Random bytes to make ConfigHeaderStep unique. Refresh this with new

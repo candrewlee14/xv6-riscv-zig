@@ -14,7 +14,7 @@ const RingbufMan = @import("ringbuf.zig");
 
 const log = std.log.scoped(.kmain);
 
-var started = Atomic(bool).init(false);
+var started = std.atomic.Value(bool).init(false);
 
 pub fn kmain() void {
     if (c.cpuid() == 0) {
@@ -34,9 +34,9 @@ pub fn kmain() void {
         c.virtio_disk_init(); // emulated hard disk
         RingbufMan.init();
         c.userinit(); // first user process
-        started.store(true, .SeqCst);
+        started.store(true, .seq_cst);
     } else {
-        while (!started.load(.SeqCst)) {}
+        while (!started.load(.seq_cst)) {}
 
         log.info("hart {d} starting", .{c.cpuid()});
         c.kvminithart(); // turn on paging

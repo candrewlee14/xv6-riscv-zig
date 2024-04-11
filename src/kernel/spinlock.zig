@@ -8,7 +8,7 @@ const c = @cImport({
 });
 const std = @import("std");
 const assert = std.debug.assert;
-const Atomic = std.atomic.Atomic;
+const Atomic = std.atomic.Value;
 const riscv = @import("common").riscv;
 
 const c_spinlock = extern struct {

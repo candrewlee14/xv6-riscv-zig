@@ -103,10 +103,9 @@ pub fn panic(
     while (true) {}
 }
 
-pub const std_options = struct {
+pub const std_options = std.Options{
     // Set the log level to info
-    pub const log_level = .debug;
-
+    .log_level = .debug,
     // Define logFn to override the std implementation
-    pub const logFn = log_root.klogFn;
+    .logFn = log_root.klogFn,
 };

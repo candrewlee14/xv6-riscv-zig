@@ -23,7 +23,7 @@ fn logCallback(context: void, str: []const u8) LoggingError!usize {
     return sys.write(1, str) catch @panic("log write error");
 }
 
-pub fn UlogFn(
+pub fn ulogFn(
     comptime level: std.log.Level,
     comptime scope: @TypeOf(.EnumLiteral),
     comptime format: []const u8,
@@ -56,7 +56,7 @@ fn cPanic(s: [*:0]u8) callconv(.C) noreturn {
     sys.exit(1);
 }
 comptime {
-    @export(cPanic, .{ .name = "panic", .linkage = .Strong });
+    @export(cPanic, .{ .name = "panic", .linkage = .strong });
 }
 
 pub fn panic(
@@ -91,7 +91,7 @@ pub export fn printf(format: [*:0]const u8, ...) void {
             writeByte(byte) catch @panic("write byte failed");
             continue;
         }
-        var ch = format[i + 1] & 0xff;
+        const ch = format[i + 1] & 0xff;
         skip_idx = i + 1;
         if (ch == 0) break;
         switch (ch) {
@@ -99,7 +99,7 @@ pub export fn printf(format: [*:0]const u8, ...) void {
             'x' => print("{x}", .{@cVaArg(&ap, c_int)}),
             'p' => print("{p}", .{@cVaArg(&ap, *usize)}),
             's' => {
-                var s = std.mem.span(@cVaArg(&ap, [*:0]const u8));
+                const s = std.mem.span(@cVaArg(&ap, [*:0]const u8));
                 print("{s}", .{s});
             },
             '%' => writeByte('%') catch @panic("write byte failed"),

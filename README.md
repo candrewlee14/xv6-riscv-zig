@@ -18,6 +18,8 @@ To run the kernel in QEMU with GDB, run:
 ```bash
 zig build -fqemu -Dgdb
 ```
+For GDB, you'll need `gdb-multiarch`.
+Then you can run `gdb-multiarch -x ./.gdbinit.tmpl-riscv`.
 
 ## Adding a User Program
 

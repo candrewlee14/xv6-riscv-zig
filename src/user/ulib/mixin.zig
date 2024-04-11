@@ -24,16 +24,16 @@ pub const ProgMixin = struct {
         sys.exit(0);
     }
     comptime {
-        @export(c_main, .{ .name = "main", .linkage = .Strong });
+        @export(c_main, .{ .name = "main", .linkage = .strong });
+        @export(c_main, .{ .name = "_start", .linkage = .strong });
     }
 };
 
-pub const std_options = struct {
+pub const std_options = std.Options{
     // Set the log level to info
-    pub const log_level = .debug;
-
+    .log_level = .debug,
     // Define logFn to override the std implementation
-    pub const logFn = log.UlogFn;
+    .logFn = log.ulogFn,
 };
 
 // This is a dummy implementation of the os package for the purposes of
