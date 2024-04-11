@@ -112,8 +112,8 @@ pub export fn printf(format: [*:0]const u8, ...) void {
             'd' => print("{d}", .{@cVaArg(&ap, c_int)}),
             'x' => print("{x}", .{@cVaArg(&ap, c_int)}),
             'p' => {
-                const u = @cVaArg(&ap, usize);
-                print("{d}", .{u});
+                const p = @cVaArg(&ap, *usize);
+                print("{p}", .{p});
             },
             's' => {
                 const s = std.mem.span(@cVaArg(&ap, [*:0]const u8));

@@ -155,6 +155,7 @@ pub fn build(b: *std.Build) !void {
     kernel.addCSourceFiles(.{ .files = &kernel_src, .flags = &cflags });
     kernel.addIncludePath(.{ .path = "src" });
     kernel.setLinkerScript(.{ .path = kernel_linker });
+    kernel.entry = .{ .symbol_name = "_entry" };
     kernel.root_module.strip = false;
     kernel.root_module.single_threaded = true;
     kernel.root_module.code_model = .medium;
@@ -209,6 +210,8 @@ pub fn build(b: *std.Build) !void {
         user_prog.setLinkerScript(.{ .path = user_linker });
         user_prog.root_module.single_threaded = true;
         user_prog.root_module.code_model = .medium;
+        user_prog.entry = .{ .symbol_name = "_main" };
+        // user_prog.root_module.strip = false;
         user_prog.step.dependOn(&syscall_gen_step.step);
         b.installArtifact(user_prog);
         try artifacts.append(user_prog);
