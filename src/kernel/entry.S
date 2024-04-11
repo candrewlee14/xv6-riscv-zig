@@ -3,7 +3,9 @@
         # kernel.ld causes the following code to
         # be placed at 0x80000000.
 .section .text
+.global _start
 .global _entry
+_start:
 _entry:
         # set up a stack for C.
         # stack0 is declared in start.c,
