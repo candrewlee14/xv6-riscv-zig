@@ -4,7 +4,7 @@ This compiles the xv6-riscv project with the Zig build system, and supports incr
 There are examples of kernel code and user programs using both C and Zig.
 
 Can build on Linux, OSX, and even Windows with only these system dependencies:
-- Zig 0.11 ([download here](https://ziglang.org/download))
+- Zig 0.12 ([download here](https://ziglang.org/download))
 - QEMU
 
 ## Usage
